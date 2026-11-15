@@ -1,16 +1,18 @@
 # CLAUDE.md — AegisGraph
 
-Hibrit (ML + Graf) gerçek zamanlı dolandırıcılık tespit sistemi. 7 günlük plan; her oturum bu
-dosyayı okuyarak başlar. Mimari kararlar burada; ayrıntılı domain kuralları `.antigravity/rules.md`.
+Hibrit (ML + Graf) gerçek zamanlı dolandırıcılık tespit sistemi. Her oturum bu dosyayı
+okuyarak başlar. Mimari kararlar burada; ayrıntılı domain kuralları `.antigravity/rules.md`.
 
-## Yol haritası
-| Gün | Kapsam | Modül |
-|---|---|---|
-| 1 ✅ | Konfigürasyon, veri modeli, SQLite, sentetik veri motoru, testler | `config/`, `src/database/`, `src/generator/` |
-| 2 ✅ | NetworkX graf özellikleri + LightGBM, temporal değerlendirme, SHAP, Alert yazımı | `src/features/`, `src/models/` |
-| 3 | FastAPI skorlama + SSE ile canlı işlem/alert akışı | `src/api/` |
-| 4 | Otonom soruşturma ajanı (Alert → kanıt toplama → rapor) | `src/agent/` |
-| 5 | Dashboard | — |
+## Modül yapısı
+| Modül | Kapsam |
+|---|---|
+| `config/` | Merkezi konfigürasyon ve eşik yönetimi |
+| `src/database/` | Veri modeli, şema tanımları, SQLite motoru |
+| `src/generator/` | Sentetik bankacılık ve fraud senaryosu motoru |
+| `src/features/` | NetworkX graf ve davranışsal özellik çıkarımı (`FeatureExtractor`) |
+| `src/models/` | LightGBM eğitimi, temporal değerlendirme, SHAP açıklayıcı, Alert yazımı |
+| `src/api/` | FastAPI gerçek zamanlı skorlama ve SSE ile canlı işlem/alert akışı |
+| `src/agent/` | Otonom soruşturma ajanı (Alert → kanıt toplama → rapor) |
 
 ## Komutlar (Windows, proje kökünden)
 ```powershell
@@ -37,7 +39,7 @@ dosyayı okuyarak başlar. Mimari kararlar burada; ayrıntılı domain kurallar�
 - **Determinizm:** tüm rastgelelik `np.random.default_rng(seed)` üzerinden; global `random`/`np.random.*` yok.
 - Enum'lar `StrEnum`, isim == değer, DB'de string (`native_enum=False`).
 
-## Özellik ve model mimarisi (Gün 2)
+## Özellik ve model mimarisi
 - `FeatureExtractor` (src/features/pipeline.py) **durumlu ve kronolojiktir**: her işlem için önce
   `features()` (yalnızca geçmiş), sonra `update()`. Batch `fit_transform` satır satır `transform_one`
   çağırır → train/serve aynı kod yolu. Geriye giden zaman damgası `ValueError`.
@@ -48,7 +50,7 @@ dosyayı okuyarak başlar. Mimari kararlar burada; ayrıntılı domain kurallar�
 - Split: `ModelSettings.train_days/val_days` (21/4/5). Hiperparametre ve operating-point eşiği
   (hedef FPR) **validasyonda** seçilir, test yalnızca raporlanır.
 - Artefaktlar `artifacts/`: `model.txt`, `feature_columns.json`, `metrics.json`, `report.md`,
-  `feature_importance.csv`, `feature_extractor.joblib` (Gün 3 online skorlama için sıcak durum).
+  `feature_importance.csv`, `feature_extractor.joblib` (online skorlama için sıcak durum).
   Model yüklenirken özellik listesi `FEATURE_COLUMNS` ile birebir doğrulanır (şema kayması koruması).
 - Alert: `risk_score >= settings.FRAUD_THRESHOLD` (`risk.alert_score`); `reasons` = SHAP top-3
   (feature, value, shap_value, family, description); `graph_score` = pozitif SHAP içindeki graf payı.
@@ -56,7 +58,7 @@ dosyayı okuyarak başlar. Mimari kararlar burada; ayrıntılı domain kurallar�
   seansı, yeni meşru hesaplar) ve zor fraud (yurt içi saldırgan, devşirilmiş eski mule hesapları) vardır;
   bunlar kaldırılırsa model tek-özellik kısayolları öğrenir.
 
-## Sentetik veri senaryoları (Gün 1)
+## Sentetik veri senaryoları
 | Senaryo | İmza (modelin yakalaması beklenen sinyal) |
 |---|---|
 | `FRAUD_RING` | Yeni + düşük KYC hesaplar, ortak cihaz & /24 IP alt ağı, dakikalar içinde dairesel transfer, her adımda azalan tutar |
@@ -72,5 +74,5 @@ normal alışveriş de yapar.
 - Her yeni modül için `tests/` altında pytest; yeni fraud senaryosu = topolojisini doğrulayan test.
 - Docstring ve log mesajları Türkçe, tanımlayıcılar İngilizce.
 - `print` yalnızca CLI özetinde; diğer her yerde `logging`.
-- Gün N iskeleti boş `__init__.py`'dır; önceki günlerin public API'si (`SyntheticDataset`,
+- Yeni modül iskeletleri boş `__init__.py`'dır; mevcut modüllerin public API'si (`SyntheticDataset`,
   `persist_dataset`, `load_table`, `get_settings`) kırılmadan genişletilir.
