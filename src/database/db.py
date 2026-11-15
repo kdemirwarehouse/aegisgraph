@@ -110,7 +110,7 @@ def persist_dataset(
 
 
 def load_table(table: str, engine: Engine | None = None) -> pd.DataFrame:
-    """Bir tabloyu DataFrame olarak okur (2. gün feature pipeline'ı için)."""
+    """Bir tabloyu DataFrame olarak okur"""
     if table not in Base.metadata.tables:
         raise KeyError(f"Bilinmeyen tablo: {table}")
     return pd.read_sql_table(table, engine or get_engine())
