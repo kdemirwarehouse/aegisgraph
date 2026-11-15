@@ -1,4 +1,3 @@
-# --- Gün 1: çekirdek ---
 pydantic>=2.7,<3
 pydantic-settings>=2.3,<3
 SQLAlchemy>=2.0.30,<2.1
@@ -6,7 +5,6 @@ numpy>=1.26,<3
 pandas>=2.2,<3
 Faker>=25.0
 
-# --- Gün 2: ML + graf + açıklanabilirlik ---
 networkx>=3.3,<4
 scipy>=1.13              # nx.pagerank (scipy backend)
 lightgbm>=4.3,<5
@@ -14,11 +12,9 @@ scikit-learn>=1.5,<2
 shap>=0.45,<1
 joblib>=1.4
 
-# --- Gün 3: API ---
 # fastapi>=0.111
 # uvicorn[standard]>=0.30
 # sse-starlette>=2.1
 
-# --- Geliştirme ---
 pytest>=8.2
 ruff>=0.5
