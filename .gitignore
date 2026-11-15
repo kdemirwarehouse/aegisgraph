@@ -1,0 +1,32 @@
+# Veri (dizin yapısı .gitkeep ile korunur)
+data/*
+!data/raw/
+data/raw/*
+!data/raw/.gitkeep
+*.db
+*.db-wal
+*.db-shm
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Ortam / gizli bilgiler
+.env
+
+# Model artefaktları (Gün 2+) — ikili dosyalar yeniden üretilebilir; rapor ve metrikler versiyonlanır
+artifacts/*
+!artifacts/report.md
+!artifacts/metrics.json
+!artifacts/feature_importance.csv
+*.pkl
+*.joblib
+
+# IDE
+.vscode/
+.idea/

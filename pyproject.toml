@@ -1,0 +1,18 @@
+[project]
+name = "aegisgraph"
+version = "0.1.0"
+description = "Hybrid ML + Graph real-time fraud detection with an autonomous investigation agent"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-ra -q"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+ignore = ["RUF001", "RUF002", "RUF003"]  # Türkçe karakterler
