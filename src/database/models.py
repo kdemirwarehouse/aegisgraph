@@ -211,7 +211,7 @@ class Transaction(Base):
 
 
 class Alert(Base):
-    """Skorlama motorunun (2.-3. gün) ve soruşturma ajanının (4. gün) ürettiği alarm."""
+    """Skorlama motorunun ve soruşturma ajanının ürettiği alarm."""
 
     __tablename__ = "alerts"
 
