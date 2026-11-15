@@ -34,7 +34,7 @@ Bu dosya, projede çalışan her IDE ajanı / SDK için bağlayıcıdır. Mimari
 - PII: veri tamamen sentetik; gerçek müşteri verisi repoya ve loglara girmez. Loglarda IBAN maskelenir
   (Gün 3+ API katmanında `TR** **** **** **** **** **12 34` formatı).
 
-## 5. Ajan (Gün 4) kuralları
+## 5. Ajan kuralları
 - Ajan karar vermez, **öneri** üretir; `CONFIRMED_FRAUD` / blok kararı insan analist onayı gerektirir.
 - Her bulgu kaynak işlem/kenar ID'leri ile kanıtlanır (açıklanabilirlik).
 - Ajan yalnızca okuma araçlarına sahiptir; DB'ye yalnızca `alerts` tablosundaki not/durum alanlarını yazar.
