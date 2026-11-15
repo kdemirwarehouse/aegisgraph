@@ -1,0 +1,294 @@
+{
+  "lightgbm": {
+    "val": {
+      "n": 10874,
+      "n_fraud": 93,
+      "fraud_rate": 0.00855251057568512,
+      "pr_auc": 0.9984580110972152,
+      "roc_auc": 0.9999860367651972,
+      "recall_at_1%_fpr": 1.0,
+      "operating_point": {
+        "threshold": 0.00017876371245391175,
+        "target_fpr": 0.01,
+        "flagged": 200,
+        "recall": 1.0,
+        "precision": 0.465,
+        "fpr": 0.009924867823021983
+      },
+      "alert_point": {
+        "threshold": 0.7,
+        "flagged": 81,
+        "recall": 0.8709677419354839,
+        "precision": 1.0,
+        "fpr": 0.0
+      },
+      "amount_weighted_recall_at_operating": 1.0,
+      "recall_by_scenario": {
+        "FRAUD_RING": {
+          "n": 0,
+          "recall_at_operating": NaN,
+          "recall_at_alert": NaN
+        },
+        "ACCOUNT_TAKEOVER": {
+          "n": 4,
+          "recall_at_operating": 1.0,
+          "recall_at_alert": 1.0
+        },
+        "MONEY_MULE": {
+          "n": 53,
+          "recall_at_operating": 1.0,
+          "recall_at_alert": 0.7924528301886793
+        },
+        "CARD_TESTING": {
+          "n": 36,
+          "recall_at_operating": 1.0,
+          "recall_at_alert": 0.9722222222222222
+        }
+      }
+    },
+    "test": {
+      "n": 13590,
+      "n_fraud": 140,
+      "fraud_rate": 0.010301692420897719,
+      "pr_auc": 0.9992398734769093,
+      "roc_auc": 0.9999920339883165,
+      "recall_at_1%_fpr": 1.0,
+      "operating_point": {
+        "threshold": 0.00017876371245391175,
+        "target_fpr": 0.01,
+        "flagged": 279,
+        "recall": 1.0,
+        "precision": 0.5017921146953405,
+        "fpr": 0.01033457249070632
+      },
+      "alert_point": {
+        "threshold": 0.7,
+        "flagged": 124,
+        "recall": 0.8857142857142857,
+        "precision": 1.0,
+        "fpr": 0.0
+      },
+      "amount_weighted_recall_at_operating": 1.0,
+      "recall_by_scenario": {
+        "FRAUD_RING": {
+          "n": 32,
+          "recall_at_operating": 1.0,
+          "recall_at_alert": 0.9375
+        },
+        "ACCOUNT_TAKEOVER": {
+          "n": 26,
+          "recall_at_operating": 1.0,
+          "recall_at_alert": 1.0
+        },
+        "MONEY_MULE": {
+          "n": 57,
+          "recall_at_operating": 1.0,
+          "recall_at_alert": 0.7543859649122807
+        },
+        "CARD_TESTING": {
+          "n": 25,
+          "recall_at_operating": 1.0,
+          "recall_at_alert": 1.0
+        }
+      }
+    }
+  },
+  "baseline_logreg": {
+    "test": {
+      "n": 13590,
+      "n_fraud": 140,
+      "fraud_rate": 0.010301692420897719,
+      "pr_auc": 0.9089356924457934,
+      "roc_auc": 0.9984423791821561,
+      "recall_at_1%_fpr": 0.9857142857142858,
+      "operating_point": {
+        "threshold": 0.11340041296019339,
+        "target_fpr": 0.01,
+        "flagged": 251,
+        "recall": 0.9785714285714285,
+        "precision": 0.545816733067729,
+        "fpr": 0.008475836431226767
+      },
+      "alert_point": {
+        "threshold": 0.7,
+        "flagged": 132,
+        "recall": 0.7785714285714286,
+        "precision": 0.8257575757575758,
+        "fpr": 0.0017100371747211895
+      },
+      "amount_weighted_recall_at_operating": 0.9859062424515854,
+      "recall_by_scenario": {
+        "FRAUD_RING": {
+          "n": 32,
+          "recall_at_operating": 0.9375,
+          "recall_at_alert": 0.78125
+        },
+        "ACCOUNT_TAKEOVER": {
+          "n": 26,
+          "recall_at_operating": 1.0,
+          "recall_at_alert": 1.0
+        },
+        "MONEY_MULE": {
+          "n": 57,
+          "recall_at_operating": 0.9824561403508771,
+          "recall_at_alert": 0.5789473684210527
+        },
+        "CARD_TESTING": {
+          "n": 25,
+          "recall_at_operating": 1.0,
+          "recall_at_alert": 1.0
+        }
+      }
+    }
+  },
+  "lightgbm_tabular_only": {
+    "test": {
+      "n": 13590,
+      "n_fraud": 140,
+      "fraud_rate": 0.010301692420897719,
+      "pr_auc": 0.7111754316507245,
+      "roc_auc": 0.9482081784386618,
+      "recall_at_1%_fpr": 0.6928571428571428,
+      "operating_point": {
+        "threshold": 0.0010196314372272473,
+        "target_fpr": 0.01,
+        "flagged": 231,
+        "recall": 0.6928571428571428,
+        "precision": 0.4199134199134199,
+        "fpr": 0.009962825278810409
+      },
+      "alert_point": {
+        "threshold": 0.7,
+        "flagged": 82,
+        "recall": 0.5642857142857143,
+        "precision": 0.9634146341463414,
+        "fpr": 0.00022304832713754646
+      },
+      "amount_weighted_recall_at_operating": 0.9152878735166179,
+      "recall_by_scenario": {
+        "FRAUD_RING": {
+          "n": 32,
+          "recall_at_operating": 1.0,
+          "recall_at_alert": 0.71875
+        },
+        "ACCOUNT_TAKEOVER": {
+          "n": 26,
+          "recall_at_operating": 1.0,
+          "recall_at_alert": 1.0
+        },
+        "MONEY_MULE": {
+          "n": 57,
+          "recall_at_operating": 0.24561403508771928,
+          "recall_at_alert": 0.08771929824561403
+        },
+        "CARD_TESTING": {
+          "n": 25,
+          "recall_at_operating": 1.0,
+          "recall_at_alert": 1.0
+        }
+      }
+    }
+  },
+  "split": {
+    "train": {
+      "start": "2026-10-01 00:02:08",
+      "end": "2026-10-21 23:59:54",
+      "n": 56622,
+      "n_fraud": 613
+    },
+    "val": {
+      "start": "2026-10-22 00:00:57",
+      "end": "2026-10-25 23:59:02",
+      "n": 10874,
+      "n_fraud": 93
+    },
+    "test": {
+      "start": "2026-10-26 00:05:38",
+      "end": "2026-10-30 23:59:35",
+      "n": 13590,
+      "n_fraud": 140
+    }
+  },
+  "search_history": [
+    {
+      "num_leaves": 31,
+      "min_child_samples": 30,
+      "learning_rate": 0.05,
+      "feature_fraction": 0.9,
+      "reg_lambda": 1.0,
+      "spw_power": 0.5,
+      "best_iteration": 678,
+      "val_pr_auc": 0.9971096394035733
+    },
+    {
+      "num_leaves": 15,
+      "min_child_samples": 80,
+      "learning_rate": 0.05,
+      "feature_fraction": 0.7,
+      "reg_lambda": 1.0,
+      "spw_power": 1.0,
+      "best_iteration": 355,
+      "val_pr_auc": 0.9984580110972152
+    },
+    {
+      "num_leaves": 15,
+      "min_child_samples": 80,
+      "learning_rate": 0.03,
+      "feature_fraction": 0.7,
+      "reg_lambda": 1.0,
+      "spw_power": 1.0,
+      "best_iteration": 529,
+      "val_pr_auc": 0.9983158242455623
+    },
+    {
+      "num_leaves": 63,
+      "min_child_samples": 80,
+      "learning_rate": 0.1,
+      "feature_fraction": 0.9,
+      "reg_lambda": 1.0,
+      "spw_power": 0.5,
+      "best_iteration": 1079,
+      "val_pr_auc": 0.986757387859566
+    },
+    {
+      "num_leaves": 63,
+      "min_child_samples": 30,
+      "learning_rate": 0.05,
+      "feature_fraction": 0.7,
+      "reg_lambda": 0.0,
+      "spw_power": 1.0,
+      "best_iteration": 409,
+      "val_pr_auc": 0.9978935430368799
+    },
+    {
+      "num_leaves": 63,
+      "min_child_samples": 30,
+      "learning_rate": 0.05,
+      "feature_fraction": 0.9,
+      "reg_lambda": 1.0,
+      "spw_power": 0.5,
+      "best_iteration": 685,
+      "val_pr_auc": 0.9963017018439956
+    },
+    {
+      "num_leaves": 31,
+      "min_child_samples": 10,
+      "learning_rate": 0.03,
+      "feature_fraction": 0.9,
+      "reg_lambda": 5.0,
+      "spw_power": 0.5,
+      "best_iteration": 805,
+      "val_pr_auc": 0.9928181552376316
+    },
+    {
+      "num_leaves": 63,
+      "min_child_samples": 80,
+      "learning_rate": 0.03,
+      "feature_fraction": 0.9,
+      "reg_lambda": 0.0,
+      "spw_power": 1.0,
+      "best_iteration": 632,
+      "val_pr_auc": 0.9963586947984963
+    }
+  ]
+}
