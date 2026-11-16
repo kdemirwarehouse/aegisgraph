@@ -1,6 +1,6 @@
 # AegisGraph — Model Raporu
 
-Oluşturulma: 2026-11-15 21:52 UTC
+Oluşturulma: 2026-11-16 22:25 UTC
 
 ## Test seti (temporal hold-out)
 

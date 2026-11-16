@@ -113,6 +113,11 @@ class FeatureExtractor:
         self._last_ts = -math.inf
         self.n_processed = 0
 
+    @property
+    def last_timestamp(self) -> float | None:
+        """Şimdiye kadar duruma işlenmiş en son işlem zaman damgası (epoch saniye)."""
+        return None if math.isinf(self._last_ts) else self._last_ts
+
     # ------------------------------------------------------------------ API
     @staticmethod
     def sanitize(tx: Mapping[str, Any]) -> dict[str, Any]:
@@ -144,9 +149,9 @@ class FeatureExtractor:
             geo_country=clean["geo_country"],
         )
         feats.update(self.graph.features(ts, sender, receiver, device, ip))
-        self._last_ts = ts
 
         if update_state:
+            self._last_ts = ts
             self.tabular.update(ts=ts, sender=sender, receiver=receiver, device=device, ip=ip, amount=amount)
             self.graph.update(ts, sender, receiver, device, ip, amount)
             self.n_processed += 1

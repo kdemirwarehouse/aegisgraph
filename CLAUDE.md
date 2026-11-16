@@ -19,6 +19,8 @@ okuyarak başlar. Mimari kararlar burada; ayrıntılı domain kuralları `.antig
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe -m src.generator.synthetic_data          # CSV + SQLite üret
 .\.venv\Scripts\python.exe -m src.models.train                    # özellik + eğitim + artifacts/ + alerts
+.\.venv\Scripts\python.exe -m src.api.main                        # FastAPI + SSE sunucusu
+.\.venv\Scripts\python.exe -m src.api.simulator --count 30        # canlı trafik simülatörü
 .\.venv\Scripts\python.exe -m pytest                                # tüm testler (~60 sn)
 .\.venv\Scripts\python.exe -m ruff check .
 ```
@@ -54,6 +56,16 @@ okuyarak başlar. Mimari kararlar burada; ayrıntılı domain kuralları `.antig
   Model yüklenirken özellik listesi `FEATURE_COLUMNS` ile birebir doğrulanır (şema kayması koruması).
 - Alert: `risk_score >= settings.FRAUD_THRESHOLD` (`risk.alert_score`); `reasons` = SHAP top-3
   (feature, value, shap_value, family, description); `graph_score` = pozitif SHAP içindeki graf payı.
+
+## API ve canlı akış mimarisi
+- `ScoringService` (`src/api/scoring_service.py`): `artifacts/model.txt` ve sıcak `feature_extractor.joblib`
+  durumunu belleğe yükler, tekil işlemleri `RLock` altında kronolojik olarak skorlar, `RiskThresholds`
+  (`ALLOW` / `REVIEW` / `ALERT` / `BLOCK`) kararını üretir, işlemleri ve eşik üstü alarmları DB'ye yazar.
+- IBAN loglamasında `mask_iban` (`TR** **** **** **** **** **12 34`) zorunludur.
+- Uçlar (`src/api/routes.py` & `main.py`): `POST /transactions/score`, `GET /stream/events` (SSE),
+  `GET /alerts`, `GET/PATCH /alerts/{alert_id}`, `GET /graph/{account_id}`, `GET /health`.
+- `TrafficSimulator` (`src/api/simulator.py`): `np.random.default_rng(seed)` ile deterministik,
+  normal + `FRAUD_RING`/`ACCOUNT_TAKEOVER`/`CARD_TESTING` akışını asenkron olarak API'ye basar.
 - Sentetik veride "hard negative"lar (meşru seyahat/VPN, telefon değişimi, aile cihazı, mikro-ödeme
   seansı, yeni meşru hesaplar) ve zor fraud (yurt içi saldırgan, devşirilmiş eski mule hesapları) vardır;
   bunlar kaldırılırsa model tek-özellik kısayolları öğrenir.

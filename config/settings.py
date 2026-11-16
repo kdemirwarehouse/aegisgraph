@@ -126,6 +126,22 @@ class ModelSettings(BaseModel):
     explain_top_k: int = Field(3, ge=1, le=10)
 
 
+class ApiSettings(BaseModel):
+    """FastAPI servisi, SSE akışı ve trafik simülatörü parametreleri (Gün 3)."""
+
+    host: str = "127.0.0.1"
+    port: int = Field(8000, ge=1, le=65535)
+    stream_buffer_size: int = Field(200, ge=10, le=10_000, description="SSE geçmiş olay tampon boyutu")
+    stream_heartbeat_seconds: float = Field(15.0, gt=0)
+    default_alerts_limit: int = Field(50, ge=1, le=500)
+    max_alerts_limit: int = Field(500, ge=1, le=5000)
+    graph_default_hops: int = Field(2, ge=1, le=4)
+    graph_max_hops: int = Field(3, ge=1, le=5)
+    graph_max_nodes: int = Field(150, ge=10, le=1000)
+    simulator_tps: float = Field(5.0, gt=0, le=200.0)
+    simulator_fraud_ratio: float = Field(0.25, ge=0, le=1)
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="AEGIS_",
@@ -144,6 +160,7 @@ class Settings(BaseSettings):
     risk: RiskThresholds = Field(default_factory=RiskThresholds)
     features: FeatureSettings = Field(default_factory=FeatureSettings)
     model: ModelSettings = Field(default_factory=ModelSettings)
+    api: ApiSettings = Field(default_factory=ApiSettings)
 
     @property
     def FRAUD_THRESHOLD(self) -> float:  # spesifikasyondaki isim (büyük harf bilinçli)

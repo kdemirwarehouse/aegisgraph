@@ -70,6 +70,19 @@ TX-00067511  MONEY_MULE  risk=0.962  graf payı=%43
 pytest
 ```
 
+## Gerçek zamanlı API ve canlı trafik simülatörü
+
+```bash
+python -m src.api.main                          # FastAPI + SSE sunucusu (http://127.0.0.1:8000)
+python -m src.api.simulator --count 30 --tps 5  # normal + fraud senaryolarını canlı akışa basar
+```
+
+API uçları:
+- `POST /transactions/score` — Tekil işlemi milisaniyeler içinde skorlar, graf payı ve SHAP top-3 gerekçeleri döner
+- `GET /stream/events` — Yeni işlemleri ve alarmları Server-Sent Events (SSE) ile canlı yayınlar
+- `GET /alerts`, `GET/PATCH /alerts/{alert_id}` — Alarmları filtreler, görüntüler ve durum günceller
+- `GET /graph/{account_id}` — Şüpheli hesabın para akışı ve cihaz/IP komşuluk alt grafını JSON olarak döner
+
 ## Veri modeli
 
 | Tablo | Açıklama |
@@ -116,7 +129,7 @@ aegisgraph/
 │   ├── api/                   # Gerçek zamanlı skorlama API ve SSE akışı
 │   └── agent/                 # Otonom soruşturma ajanı
 ├── artifacts/                 # report.md, metrics.json (model ikilileri git dışı)
-└── tests/                     # test_generator.py, test_features_and_model.py
+└── tests/                     # test_generator.py, test_features_and_model.py, test_api.py
 ```
 
 Tüm veriler sentetiktir; gerçek kişi veya hesap bilgisi içermez.
