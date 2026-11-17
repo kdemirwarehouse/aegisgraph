@@ -19,7 +19,10 @@ from sqlalchemy.engine.url import make_url
 from sqlalchemy.orm import Session, sessionmaker
 
 from config.settings import get_settings
-from src.database.models import Account, AccountDevice, Base, Device, Transaction
+from src.database.models import Account, AccountDevice, Alert, Base, Device, Investigation, Transaction
+
+# Tüm ORM tablolarının `Base.metadata.create_all` içinde kayıtlı olduğundan emin ol
+_ORM_MODELS = (Alert, Investigation)
 
 if TYPE_CHECKING:
     from src.generator.synthetic_data import SyntheticDataset

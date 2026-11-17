@@ -79,9 +79,18 @@ python -m src.api.simulator --count 30 --tps 5  # normal + fraud senaryolarını
 
 API uçları:
 - `POST /transactions/score` — Tekil işlemi milisaniyeler içinde skorlar, graf payı ve SHAP top-3 gerekçeleri döner
-- `GET /stream/events` — Yeni işlemleri ve alarmları Server-Sent Events (SSE) ile canlı yayınlar
+- `GET /stream/events` — Yeni işlemleri, alarmları ve otonom soruşturmaları Server-Sent Events (SSE) ile canlı yayınlar
 - `GET /alerts`, `GET/PATCH /alerts/{alert_id}` — Alarmları filtreler, görüntüler ve durum günceller
+- `POST /alerts/{alert_id}/investigate` — İlgili alarm için otonom soruşturmayı başlatır ve SAR raporunu kaydeder
+- `GET /alerts/{alert_id}/investigation` — Kayıtlı otonom soruşturma (SAR) raporunu döndürür
 - `GET /graph/{account_id}` — Şüpheli hesabın para akışı ve cihaz/IP komşuluk alt grafını JSON olarak döner
+
+## Otonom soruşturma ajanı
+
+Kritik alarmlarda (`AEGIS_AGENT__AUTO_INVESTIGATE_MIN_SCORE`, varsayılan `0.85`) otomatik tetiklenen veya `POST /alerts/{alert_id}/investigate` ile çağrılan `FraudInvestigatorAgent` (`src/agent/`), salt-okunur kanıt araçlarıyla (`get_alert_evidence`, `get_account_profile`, `get_recent_transactions`, `get_network_connections`) delil zinciri toplar, tüm IBAN'ları maskeler ve Türkçe MASAK/SAR formatında rapor üretir:
+
+- **Tipolojiler:** `FRAUD_RING`, `ACCOUNT_TAKEOVER`, `MONEY_MULE`, `CARD_TESTING`, `ANOMALOUS_ACTIVITY`
+- **Human-in-the-Loop:** Önerilen aksiyonlar (`BLOCK_ACCOUNT`, `FREEZE_TX`, `ENHANCED_DUE_DILIGENCE`, `FALSE_POSITIVE_DISMISS`) daima `requires_human_approval=true` ile insan analist onayına sunulur.
 
 ## Veri modeli
 
@@ -92,6 +101,7 @@ API uçları:
 | `account_devices` | Hesap ↔ cihaz kenarları (graf için bipartit ilişki) |
 | `transactions` | Tutar (kuruş), kanal, IP, konum + ground-truth etiketleri |
 | `alerts` | Risk skoru, graf katkı payı ve SHAP gerekçeleri |
+| `investigations` | Otonom soruşturma ajanının ürettiği SAR raporu, kanıt zinciri ve öneri |
 
 ## Fraud senaryoları
 
@@ -129,7 +139,7 @@ aegisgraph/
 │   ├── api/                   # Gerçek zamanlı skorlama API ve SSE akışı
 │   └── agent/                 # Otonom soruşturma ajanı
 ├── artifacts/                 # report.md, metrics.json (model ikilileri git dışı)
-└── tests/                     # test_generator.py, test_features_and_model.py, test_api.py
+└── tests/                     # test_generator.py, test_features_and_model.py, test_api.py, test_agent.py
 ```
 
 Tüm veriler sentetiktir; gerçek kişi veya hesap bilgisi içermez.

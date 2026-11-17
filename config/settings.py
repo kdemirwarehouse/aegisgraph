@@ -85,7 +85,7 @@ class GeneratorSettings(BaseModel):
 
 
 class RiskThresholds(BaseModel):
-    """Karar eşikleri. 2. gün (model) ve 3. gün (API) bu değerleri tüketir."""
+    """Karar eşikleri. Model ve API katmanı bu değerleri tüketir."""
 
     review_score: float = Field(0.50, ge=0, le=1, description="Bu skorun üstü manuel inceleme kuyruğuna")
     alert_score: float = Field(0.70, ge=0, le=1, description="Bu skorun üstü Alert üretir")
@@ -102,7 +102,7 @@ class RiskThresholds(BaseModel):
 
 
 class FeatureSettings(BaseModel):
-    """Özellik mühendisliği parametreleri (Gün 2). Batch ve online yol aynı değerleri kullanır."""
+    """Özellik mühendisliği parametreleri. Batch ve online yol aynı değerleri kullanır."""
 
     home_country: str = Field("TR", pattern=r"^[A-Z]{2}$")
     night_start_hour: int = Field(1, ge=0, le=23)
@@ -113,7 +113,7 @@ class FeatureSettings(BaseModel):
 
 
 class ModelSettings(BaseModel):
-    """Eğitim, temporal split ve artefakt ayarları (Gün 2)."""
+    """Eğitim, temporal split ve artefakt ayarları."""
 
     artifacts_dir: Path = PROJECT_ROOT / "artifacts"
     train_days: int = Field(21, ge=1)
@@ -127,7 +127,7 @@ class ModelSettings(BaseModel):
 
 
 class ApiSettings(BaseModel):
-    """FastAPI servisi, SSE akışı ve trafik simülatörü parametreleri (Gün 3)."""
+    """FastAPI servisi, SSE akışı ve trafik simülatörü parametreleri."""
 
     host: str = "127.0.0.1"
     port: int = Field(8000, ge=1, le=65535)
@@ -140,6 +140,24 @@ class ApiSettings(BaseModel):
     graph_max_nodes: int = Field(150, ge=10, le=1000)
     simulator_tps: float = Field(5.0, gt=0, le=200.0)
     simulator_fraud_ratio: float = Field(0.25, ge=0, le=1)
+
+
+class AgentSettings(BaseModel):
+    """Otonom finansal soruşturma ajanı ve SAR raporlama ayarları."""
+
+    auto_investigate_min_score: float = Field(
+        0.85,
+        ge=0.0,
+        le=1.0,
+        description="Bu skor ve üzerindeki alarmlarda otonom soruşturma otomatik tetiklenir",
+    )
+    max_tool_steps: int = Field(6, ge=1, le=20, description="Soruşturma başına maksimum araç çağrısı adımı")
+    history_lookback_days: int = Field(30, ge=1, le=365, description="Geçmiş işlem ve ağ analizi penceresi (gün)")
+    recent_tx_limit: int = Field(20, ge=1, le=200, description="İncelenecek son işlem sayısı sınırı")
+    provider: Literal["local", "openai", "gemini"] = "local"
+    model_name: str = "aegis-sar-synthesizer-v1"
+    api_key: str | None = None
+    temperature: float = Field(0.0, ge=0.0, le=1.0)
 
 
 class Settings(BaseSettings):
@@ -161,6 +179,7 @@ class Settings(BaseSettings):
     features: FeatureSettings = Field(default_factory=FeatureSettings)
     model: ModelSettings = Field(default_factory=ModelSettings)
     api: ApiSettings = Field(default_factory=ApiSettings)
+    agent: AgentSettings = Field(default_factory=AgentSettings)
 
     @property
     def FRAUD_THRESHOLD(self) -> float:  # spesifikasyondaki isim (büyük harf bilinçli)

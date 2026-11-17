@@ -63,9 +63,22 @@ okuyarak başlar. Mimari kararlar burada; ayrıntılı domain kuralları `.antig
   (`ALLOW` / `REVIEW` / `ALERT` / `BLOCK`) kararını üretir, işlemleri ve eşik üstü alarmları DB'ye yazar.
 - IBAN loglamasında `mask_iban` (`TR** **** **** **** **** **12 34`) zorunludur.
 - Uçlar (`src/api/routes.py` & `main.py`): `POST /transactions/score`, `GET /stream/events` (SSE),
-  `GET /alerts`, `GET/PATCH /alerts/{alert_id}`, `GET /graph/{account_id}`, `GET /health`.
+  `GET /alerts`, `GET/PATCH /alerts/{alert_id}`, `POST /alerts/{alert_id}/investigate`,
+  `GET /alerts/{alert_id}/investigation`, `GET /graph/{account_id}`, `GET /health`.
 - `TrafficSimulator` (`src/api/simulator.py`): `np.random.default_rng(seed)` ile deterministik,
   normal + `FRAUD_RING`/`ACCOUNT_TAKEOVER`/`CARD_TESTING` akışını asenkron olarak API'ye basar.
+
+## Otonom soruşturma ajanı mimarisi
+- `InvestigationToolkit` (`src/agent/tools.py`): salt-okunur ve deterministik kanıt araçları
+  (`get_account_profile`, `get_recent_transactions`, `get_network_connections`, `get_alert_evidence`).
+  Tüm çıktılarda `mask_iban` uygulanır ve `GROUND_TRUTH_COLUMNS` dışlanır.
+- `FraudInvestigatorAgent` (`src/agent/investigator.py`): varsayılan `local` kural-kanıt sentezleyicisi
+  (veya opsiyonel LLM sağlayıcı) ile tipoloji sınıflandırması, kaynak işlem/cihaz/IP kimliklerine dayalı
+  `evidence_chain`, MASAK/SAR formatında Türkçe `executive_summary_tr` ve `InvestigationReport` üretir.
+- **Human-in-the-Loop:** `requires_human_approval=True` daima zorunludur; raporlar `investigations`
+  tablosuna kaydedilir ve `alerts` tablosu asla otomatik `CONFIRMED_FRAUD` durumuna alınmaz.
+- `ScoringService`, `risk_score >= settings.agent.auto_investigate_min_score` olan alarmlarda
+  soruşturmayı otomatik tetikleyip SSE akışına `investigation` olayı yayınlar.
 - Sentetik veride "hard negative"lar (meşru seyahat/VPN, telefon değişimi, aile cihazı, mikro-ödeme
   seansı, yeni meşru hesaplar) ve zor fraud (yurt içi saldırgan, devşirilmiş eski mule hesapları) vardır;
   bunlar kaldırılırsa model tek-özellik kısayolları öğrenir.

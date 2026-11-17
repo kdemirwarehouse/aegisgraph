@@ -1,4 +1,4 @@
-"""Gün 3 entegrasyon testleri: FastAPI skorlama, SSE akışı, graf uçları ve trafik simülatörü."""
+"""API entegrasyon testleri: FastAPI skorlama, SSE akışı, graf uçları ve trafik simülatörü."""
 
 from __future__ import annotations
 
@@ -206,7 +206,11 @@ def test_score_transaction_normal_and_fraud_alert(api_env: ApiTestEnv) -> None:
         alert = session.get(Alert, fraud_data["alert_id"])
         assert alert is not None
         assert alert.transaction_id == fraud_data["transaction_id"]
-        assert alert.status is AlertStatus.OPEN
+        if fraud_data["risk_score"] >= api_env.settings.agent.auto_investigate_min_score:
+            assert alert.status is AlertStatus.INVESTIGATING
+            assert fraud_data["investigation_id"] is not None
+        else:
+            assert alert.status is AlertStatus.OPEN
         tx_row = session.get(Transaction, fraud_data["transaction_id"])
         assert tx_row is not None and tx_row.amount_minor == 4_500_000
 

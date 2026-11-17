@@ -13,7 +13,13 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, IPvAnyAddress, model_validator
 
 from src.api.scoring_service import Decision, ScoringService, StreamEvent
-from src.database.models import AlertStatus, Channel, TransactionType
+from src.database.models import (
+    AlertStatus,
+    Channel,
+    RecommendedAction,
+    SuspectedTypology,
+    TransactionType,
+)
 
 router = APIRouter()
 
@@ -96,9 +102,25 @@ class TransactionScoreResponse(BaseModel):
     decision: Decision
     is_alert: bool
     alert_id: int | None
+    investigation_id: int | None = None
     reasons: list[FactorReasonModel]
     explanation: ExplanationModel | None
     latency_ms: float
+
+
+class InvestigationResponse(BaseModel):
+    investigation_id: int | None
+    alert_id: int
+    tx_id: str
+    created_at: str
+    suspected_typology: SuspectedTypology
+    confidence_score: float
+    executive_summary_tr: str
+    evidence_chain: list[str]
+    related_accounts: list[str]
+    recommended_action: RecommendedAction
+    requires_human_approval: bool
+    tool_trace: list[dict[str, Any]]
 
 
 class AlertItemModel(BaseModel):
@@ -379,6 +401,32 @@ def update_alert(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
     return AlertItemModel(**data)
+
+
+@router.post("/alerts/{alert_id}/investigate", response_model=InvestigationResponse, tags=["soruşturma"])
+def investigate_alert(
+    alert_id: int,
+    service: ServiceDep,
+) -> InvestigationResponse:
+    """İlgili alarm için otonom soruşturmayı başlatır, SAR raporunu kaydeder ve döndürür."""
+    try:
+        data = service.investigate_alert(alert_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return InvestigationResponse(**data)
+
+
+@router.get("/alerts/{alert_id}/investigation", response_model=InvestigationResponse, tags=["soruşturma"])
+def get_investigation(
+    alert_id: int,
+    service: ServiceDep,
+) -> InvestigationResponse:
+    """Kayıtlı otonom soruşturma (SAR) raporunu döndürür."""
+    try:
+        data = service.get_investigation(alert_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return InvestigationResponse(**data)
 
 
 @router.get("/graph/{account_id}", response_model=AccountGraphResponse, tags=["graf"])

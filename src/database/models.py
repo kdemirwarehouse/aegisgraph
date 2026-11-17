@@ -97,6 +97,25 @@ class AlertStatus(StrEnum):
     CLOSED = "CLOSED"
 
 
+class SuspectedTypology(StrEnum):
+    """Otonom soruşturma ajanının tespit ettiği şüpheli tipoloji sınıfı."""
+
+    FRAUD_RING = "FRAUD_RING"
+    ACCOUNT_TAKEOVER = "ACCOUNT_TAKEOVER"
+    MONEY_MULE = "MONEY_MULE"
+    CARD_TESTING = "CARD_TESTING"
+    ANOMALOUS_ACTIVITY = "ANOMALOUS_ACTIVITY"
+
+
+class RecommendedAction(StrEnum):
+    """Human-in-the-loop onayı için sunulan aksiyon önerisi."""
+
+    BLOCK_ACCOUNT = "BLOCK_ACCOUNT"
+    FREEZE_TX = "FREEZE_TX"
+    ENHANCED_DUE_DILIGENCE = "ENHANCED_DUE_DILIGENCE"
+    FALSE_POSITIVE_DISMISS = "FALSE_POSITIVE_DISMISS"
+
+
 # Eğitimde ÖZELLİK OLARAK KULLANILMAMASI gereken etiket (ground truth) kolonları.
 GROUND_TRUTH_COLUMNS: dict[str, tuple[str, ...]] = {
     "accounts": ("is_fraudster", "fraud_case_id"),
@@ -234,8 +253,42 @@ class Alert(Base):
     resolution_note: Mapped[str | None] = mapped_column(String(2000))
 
     transaction: Mapped[Transaction] = relationship(back_populates="alerts")
+    investigation: Mapped[Investigation | None] = relationship(back_populates="alert", uselist=False)
 
     __table_args__ = (CheckConstraint("risk_score BETWEEN 0 AND 1", name="ck_alerts_risk_score_range"),)
+
+
+class Investigation(Base):
+    """Otonom soruşturma ajanının bir alarm için ürettiği yapılandırılmış SAR raporu."""
+
+    __tablename__ = "investigations"
+
+    investigation_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    alert_id: Mapped[int] = mapped_column(
+        ForeignKey("alerts.alert_id"), unique=True, nullable=False, index=True
+    )
+    tx_id: Mapped[str] = mapped_column(
+        ForeignKey("transactions.transaction_id"), nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+    suspected_typology: Mapped[SuspectedTypology] = mapped_column(
+        _enum(SuspectedTypology), nullable=False
+    )
+    confidence_score: Mapped[float] = mapped_column(Float, nullable=False)
+    executive_summary_tr: Mapped[str] = mapped_column(String(4000), nullable=False)
+    evidence_chain: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    related_accounts: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    recommended_action: Mapped[RecommendedAction] = mapped_column(
+        _enum(RecommendedAction), nullable=False
+    )
+    requires_human_approval: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    tool_trace: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False, default=list)
+
+    alert: Mapped[Alert] = relationship(back_populates="investigation")
+
+    __table_args__ = (
+        CheckConstraint("confidence_score BETWEEN 0 AND 1", name="ck_investigations_confidence_range"),
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -316,12 +369,45 @@ class TransactionRecord(_Record):
         return self
 
 
+class InvestigationRecord(_Record):
+    """Soruşturma raporu sözleşmesi; insan onayı (Human-in-the-Loop) daima zorunludur."""
+
+    alert_id: int = Field(gt=0)
+    tx_id: str = Field(min_length=1, max_length=20)
+    created_at: datetime
+    suspected_typology: SuspectedTypology
+    confidence_score: float = Field(ge=0.0, le=1.0)
+    executive_summary_tr: str = Field(min_length=1, max_length=4000)
+    evidence_chain: list[str] = Field(min_length=1)
+    related_accounts: list[str]
+    recommended_action: RecommendedAction
+    requires_human_approval: bool = True
+
+    @model_validator(mode="after")
+    def _require_human_approval(self) -> InvestigationRecord:
+        if not self.requires_human_approval:
+            raise ValueError("Human-in-the-Loop ilkesi gereği requires_human_approval daima True olmalıdır")
+        return self
+
+
 RECORD_SCHEMAS: dict[str, type[_Record]] = {
     "accounts": AccountRecord,
     "devices": DeviceRecord,
     "account_devices": AccountDeviceRecord,
     "transactions": TransactionRecord,
+    "investigations": InvestigationRecord,
 }
+
+
+def mask_iban(iban: str | None) -> str:
+    """TR IBAN bilgisini log ve API/ajan çıktıları için maskeler (`TR** **** **** **** **** **12 34`)."""
+    if not iban:
+        return "TR** **** **** **** **** **** **"
+    clean = "".join(iban.split()).upper()
+    if len(clean) >= 6:
+        country = clean[:2]
+        return f"{country}** **** **** **** **** **{clean[-4:-2]} {clean[-2:]}"
+    return f"{clean[:2]}** ****"
 
 
 def record_fields(table: str) -> list[str]:
@@ -345,9 +431,14 @@ __all__: list[Any] = [
     "DeviceRecord",
     "DeviceType",
     "FraudScenario",
+    "Investigation",
+    "InvestigationRecord",
     "MerchantCategory",
+    "RecommendedAction",
+    "SuspectedTypology",
     "Transaction",
     "TransactionRecord",
     "TransactionType",
+    "mask_iban",
     "record_fields",
 ]

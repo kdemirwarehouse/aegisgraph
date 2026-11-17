@@ -24,6 +24,7 @@ import pandas as pd
 from sqlalchemy import Engine, func, or_, select
 
 from config.settings import Settings, get_settings
+from src.agent.investigator import FraudInvestigatorAgent
 from src.database.db import get_engine, init_db, session_scope
 from src.database.models import (
     GROUND_TRUTH_COLUMNS,
@@ -37,6 +38,7 @@ from src.database.models import (
     DeviceType,
     Transaction,
     TransactionType,
+    mask_iban,
 )
 from src.features.pipeline import TX_INPUT_COLUMNS, FeatureExtractor
 from src.features.tabular_features import (
@@ -90,17 +92,6 @@ class Decision(StrEnum):
     REVIEW = "REVIEW"
     ALERT = "ALERT"
     BLOCK = "BLOCK"
-
-
-def mask_iban(iban: str | None) -> str:
-    """TR IBAN bilgisini log ve API çıktıları için maskeler (`TR** **** **** **** **** **12 34`)."""
-    if not iban:
-        return "TR** **** **** **** **** **** **"
-    clean = "".join(iban.split()).upper()
-    if len(clean) >= 6:
-        country = clean[:2]
-        return f"{country}** **** **** **** **** **{clean[-4:-2]} {clean[-2:]}"
-    return f"{clean[:2]}** ****"
 
 
 def _generate_synthetic_iban(account_id: str) -> str:
@@ -221,6 +212,11 @@ class ScoringService:
         self.extractor = extractor
         self.engine = engine
         self.broadcaster = broadcaster or EventBroadcaster(max_history=self.settings.api.stream_buffer_size)
+        self.investigator = FraudInvestigatorAgent(
+            engine=self.engine,
+            extractor=self.extractor,
+            settings=self.settings,
+        )
         self._lock = threading.RLock()
         self._tx_seq = self._init_tx_sequence()
 
@@ -553,6 +549,7 @@ class ScoringService:
             "decision": decision.value,
             "is_alert": score_res.is_alert,
             "alert_id": alert_id,
+            "investigation_id": None,
             "reasons": reasons,
             "explanation": explanation_dict,
             "latency_ms": round(float(score_res.latency_ms), 3),
@@ -608,7 +605,34 @@ class ScoringService:
                         "reasons": reasons,
                     },
                 )
+                if (
+                    persist
+                    and self.engine is not None
+                    and alert_id is not None
+                    and score_res.risk_score >= self.settings.agent.auto_investigate_min_score
+                ):
+                    inv_payload = self.investigate_alert(alert_id)
+                    result["investigation_id"] = inv_payload.get("investigation_id")
         return result
+
+    # ------------------------------------------------------------------ #
+    # Otonom soruşturma
+    # ------------------------------------------------------------------ #
+    def investigate_alert(self, alert_id: int) -> dict[str, Any]:
+        """İlgili alarm için otonom soruşturmayı çalıştırır, kaydeder ve SSE akışına yayınlar."""
+        if self.engine is None:
+            raise KeyError(f"Alarm bulunamadı: {alert_id}")
+        report = self.investigator.investigate(alert_id, persist=True)
+        payload = report.model_dump(mode="json")
+        self.broadcaster.publish("investigation", payload)
+        return payload
+
+    def get_investigation(self, alert_id: int) -> dict[str, Any]:
+        """Veritabanında kayıtlı soruşturma raporunu döndürür."""
+        if self.engine is None:
+            raise KeyError(f"Alarm için kayıtlı soruşturma raporu bulunamadı: {alert_id}")
+        report = self.investigator.get_report(alert_id)
+        return report.model_dump(mode="json")
 
     # ------------------------------------------------------------------ #
     # Alert sorgulama & durum güncelleme
