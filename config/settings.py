@@ -18,7 +18,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT: Path = Path(__file__).resolve().parents[1]
@@ -154,10 +154,40 @@ class AgentSettings(BaseModel):
     max_tool_steps: int = Field(6, ge=1, le=20, description="Soruşturma başına maksimum araç çağrısı adımı")
     history_lookback_days: int = Field(30, ge=1, le=365, description="Geçmiş işlem ve ağ analizi penceresi (gün)")
     recent_tx_limit: int = Field(20, ge=1, le=200, description="İncelenecek son işlem sayısı sınırı")
-    provider: Literal["local", "openai", "gemini"] = "local"
-    model_name: str = "aegis-sar-synthesizer-v1"
-    api_key: str | None = None
+    max_evidence_ids: int = Field(25, ge=1, le=200, description="Araç çıktısında listelenecek kanıt ID üst sınırı")
+    max_cycle_paths: int = Field(3, ge=1, le=20, description="Raporlanacak maksimum döngü yolu sayısı")
+
+    # Davranışsal kanıt eşikleri (kart deneme / tutar sapması)
+    micro_tx_amount_try: float = Field(25.0, gt=0, description="Mikro işlem (kart deneme) üst tutarı (TRY)")
+    micro_burst_window_seconds: int = Field(3_600, ge=60, description="Mikro işlem patlaması penceresi (sn)")
+    card_testing_min_burst: int = Field(3, ge=2, description="Kart deneme sinyali için min. mikro işlem sayısı")
+    amount_deviation_ratio: float = Field(5.0, gt=1, description="Baz medyana göre şüpheli tutar sapma katı")
+
+    # Ağ kanıt eşikleri (katır / halka)
+    mule_min_fan_in: int = Field(4, ge=2, description="Katır hub sinyali için 24 saatlik min. farklı gönderici")
+    ring_min_shared_accounts: int = Field(2, ge=1, description="Halka sinyali için ortak cihaz/IP min. hesap sayısı")
+
+    # Tipoloji ve aksiyon karar eşikleri (öneri — insan onayı daima zorunlu)
+    min_typology_signal: float = Field(
+        0.35, ge=0.0, le=1.0, description="Bu sinyal gücünün altında tipoloji ANOMALOUS_ACTIVITY sayılır"
+    )
+    block_min_confidence: float = Field(
+        0.85, ge=0.0, le=1.0, description="Tipolojiden bağımsız BLOCK_ACCOUNT önerisi için min. güven skoru"
+    )
+
+    # Opsiyonel LLM sağlayıcı (OpenAI uyumlu Chat Completions API)
+    provider: Literal["local", "openai"] = "local"
+    model_name: str = Field("aegis-sar-synthesizer-v1", min_length=1)
+    api_key: SecretStr | None = None
+    llm_base_url: str = "https://api.openai.com/v1"
+    llm_timeout_seconds: float = Field(10.0, gt=0, le=120)
     temperature: float = Field(0.0, ge=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def _check_provider(self) -> AgentSettings:
+        if self.provider != "local" and (self.api_key is None or not self.api_key.get_secret_value()):
+            raise ValueError("LLM sağlayıcı modu için agent.api_key zorunludur (veya provider='local' kullanın)")
+        return self
 
 
 class Settings(BaseSettings):

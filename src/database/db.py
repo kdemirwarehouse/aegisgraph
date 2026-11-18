@@ -82,7 +82,11 @@ def session_scope(engine: Engine | None = None) -> Iterator[Session]:
 
 
 def init_db(engine: Engine | None = None, *, drop_existing: bool = False) -> Engine:
-    """Tüm tabloları oluşturur (idempotent). `drop_existing=True` önce siler."""
+    """Tüm tabloları oluşturur (idempotent). `drop_existing=True` önce siler.
+
+    `create_all` yalnızca eksik tabloları ekler; bu sayede `investigations` gibi yeni tablolar
+    mevcut veri tablolarına dokunmadan önceden oluşturulmuş veritabanlarına da eklenir.
+    """
     engine = engine or get_engine()
     if drop_existing:
         Base.metadata.drop_all(engine)

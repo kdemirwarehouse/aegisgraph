@@ -543,7 +543,7 @@ class FraudInvestigatorAgent:
         try:
             resp = httpx.post(
                 "https://api.openai.com/v1/chat/completions",
-                headers={"Authorization": f"Bearer {self.settings.agent.api_key}"},
+                headers={"Authorization": f"Bearer {self.settings.agent.api_key.get_secret_value()}"},
                 json={
                     "model": self.settings.agent.model_name,
                     "temperature": self.settings.agent.temperature,

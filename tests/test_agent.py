@@ -11,9 +11,9 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
-from sqlalchemy import Engine, func, select
+from sqlalchemy import Engine, func, inspect, select
 
-from config.settings import FeatureSettings, GeneratorSettings, ModelSettings, Settings
+from config.settings import AgentSettings, FeatureSettings, GeneratorSettings, ModelSettings, Settings
 from src.agent.investigator import FraudInvestigatorAgent, InvestigationReport
 from src.agent.tools import (
     get_account_profile,
@@ -29,6 +29,7 @@ from src.database.models import (
     AccountType,
     Alert,
     AlertStatus,
+    Base,
     Channel,
     FraudScenario,
     Investigation,
@@ -36,6 +37,9 @@ from src.database.models import (
     RecommendedAction,
     SuspectedTypology,
     TransactionType,
+    mask_holder_name,
+    record_fields,
+    redact_ibans,
 )
 from src.features.pipeline import FeatureExtractor
 from src.generator.synthetic_data import SyntheticDataGenerator, SyntheticDataset
@@ -243,6 +247,60 @@ def test_human_in_the_loop_schema_enforces_approval() -> None:
             recommended_action=RecommendedAction.BLOCK_ACCOUNT,
             requires_human_approval=False,
         )
+
+
+def test_agent_settings_single_source_and_provider_validation() -> None:
+    """AgentSettings `Settings.agent` üzerinden gelir; LLM modu API anahtarı olmadan reddedilir."""
+    settings = Settings()
+    assert isinstance(settings.agent, AgentSettings)
+    assert settings.agent.provider == "local"
+    assert 0.0 <= settings.agent.auto_investigate_min_score <= 1.0
+
+    with pytest.raises(ValidationError):
+        AgentSettings(provider="openai")
+    with pytest.raises(ValidationError):
+        AgentSettings(auto_investigate_min_score=1.5)
+
+    llm = AgentSettings(provider="openai", api_key="sk-test")
+    assert "sk-test" not in repr(llm), "API anahtarı repr/log çıktısında görünmemeli"
+
+
+def test_investigations_schema_matches_record_and_is_additive(tmp_path) -> None:
+    """ORM kolonları Pydantic sözleşmesiyle birebir aynıdır; `create_all` mevcut tabloları bozmaz."""
+    orm_cols = [c.name for c in Investigation.__table__.columns]
+    assert orm_cols == record_fields("investigations")
+
+    engine = create_db_engine(f"sqlite:///{(tmp_path / 'legacy.db').as_posix()}")
+    try:
+        # Soruşturma tablosu henüz yokken oluşturulmuş eski bir veritabanını simüle et
+        legacy_tables = [t for name, t in Base.metadata.tables.items() if name != "investigations"]
+        Base.metadata.create_all(engine, tables=legacy_tables)
+        with engine.begin() as conn:
+            conn.exec_driver_sql(
+                "INSERT INTO accounts (account_id, iban, holder_name, account_type, kyc_level, city, "
+                "merchant_category, opened_at, is_fraudster, fraud_case_id) VALUES "
+                "('ACC-000001', 'TR330006100519786457841326', 'Test', 'PERSONAL', 2, 'Ankara', NULL, "
+                "'2026-01-01 00:00:00', 0, NULL)"
+            )
+        assert "investigations" not in inspect(engine).get_table_names()
+
+        init_db(engine)
+        assert "investigations" in inspect(engine).get_table_names()
+        with session_scope(engine) as session:
+            assert session.scalar(select(func.count()).select_from(Base.metadata.tables["accounts"])) == 1
+    finally:
+        engine.dispose()
+
+
+def test_redaction_helpers_mask_raw_iban_and_holder_name() -> None:
+    """`redact_ibans` iç içe yapılardaki ham IBAN'ları, `mask_holder_name` isimleri maskeler."""
+    payload = {"note": "Alıcı TR33 0006 1005 1978 6457 8413 26 hesabı", "items": ["TR330006100519786457841326"]}
+    redacted = json.dumps(redact_ibans(payload), ensure_ascii=False)
+    assert not RAW_IBAN_RE.search(redacted)
+    assert "TR33 0006" not in redacted
+    assert "**13 26" in redacted
+    assert mask_holder_name("Ahmet Yılmaz") == "A**** Y*****"
+    assert mask_holder_name(None) == "***"
 
 
 @pytest.mark.parametrize(

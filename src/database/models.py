@@ -12,6 +12,7 @@ Zaman kuralı: tüm zaman damgaları UTC ve timezone-naive saklanır.
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
@@ -370,8 +371,12 @@ class TransactionRecord(_Record):
 
 
 class InvestigationRecord(_Record):
-    """Soruşturma raporu sözleşmesi; insan onayı (Human-in-the-Loop) daima zorunludur."""
+    """Soruşturma raporu sözleşmesi; insan onayı (Human-in-the-Loop) daima zorunludur.
 
+    Kolon sırası `investigations` ORM tablosuyla birebir aynıdır (`record_fields("investigations")`).
+    """
+
+    investigation_id: int | None = Field(default=None, gt=0)
     alert_id: int = Field(gt=0)
     tx_id: str = Field(min_length=1, max_length=20)
     created_at: datetime
@@ -382,6 +387,7 @@ class InvestigationRecord(_Record):
     related_accounts: list[str]
     recommended_action: RecommendedAction
     requires_human_approval: bool = True
+    tool_trace: list[dict[str, Any]] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _require_human_approval(self) -> InvestigationRecord:
@@ -408,6 +414,30 @@ def mask_iban(iban: str | None) -> str:
         country = clean[:2]
         return f"{country}** **** **** **** **** **{clean[-4:-2]} {clean[-2:]}"
     return f"{clean[:2]}** ****"
+
+
+_RAW_IBAN_RE = re.compile(r"\bTR\d{2}(?: ?\d{4}){5} ?\d{2}\b", re.IGNORECASE)
+
+
+def redact_ibans(value: Any) -> Any:
+    """Metin, liste ve sözlüklerdeki maskelenmemiş TR IBAN'ları özyinelemeli olarak maskeler.
+
+    Ajan/LLM çıktıları için derinlemesine savunma katmanıdır: ham IBAN hiçbir koşulda dışarı sızmaz.
+    """
+    if isinstance(value, str):
+        return _RAW_IBAN_RE.sub(lambda m: mask_iban(m.group(0)), value)
+    if isinstance(value, dict):
+        return {k: redact_ibans(v) for k, v in value.items()}
+    if isinstance(value, list | tuple):
+        return [redact_ibans(v) for v in value]
+    return value
+
+
+def mask_holder_name(name: str | None) -> str:
+    """Hesap sahibi adını KVKK gereği maskeler (`Ahmet Yılmaz` → `A**** Y*****`)."""
+    if not name:
+        return "***"
+    return " ".join(f"{part[0]}{'*' * max(len(part) - 1, 2)}" for part in name.split())
 
 
 def record_fields(table: str) -> list[str]:
@@ -439,6 +469,8 @@ __all__: list[Any] = [
     "Transaction",
     "TransactionRecord",
     "TransactionType",
+    "mask_holder_name",
     "mask_iban",
     "record_fields",
+    "redact_ibans",
 ]
