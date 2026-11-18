@@ -495,3 +495,35 @@ def test_investigation_api_endpoints_and_auto_sse_trigger(agent_env: AgentTestEn
     assert stream_resp.status_code == 200
     assert "event: investigation" in stream_resp.text
     assert f'"investigation_id": {scored["investigation_id"]}' in stream_resp.text
+    assert '"trigger": "auto"' in stream_resp.text
+
+    # Ajan hatası skorlamayı düşürmemeli: alarm kaydedilir, `investigation_failed` olayı yayınlanır
+    def broken_investigate(*_args: Any, **_kwargs: Any) -> InvestigationReport:
+        raise RuntimeError("ajan arızası")
+
+    original = agent_env.service.investigator.investigate
+    agent_env.service.investigator.investigate = broken_investigate  # type: ignore[method-assign]
+    try:
+        fail_resp = agent_env.client.post(
+            "/transactions/score",
+            json={
+                "timestamp": (live_ts + timedelta(minutes=3)).isoformat(),
+                "sender_account_id": personal[0],
+                "receiver_account_id": "ACC-990778",
+                "device_id": attacker_dev,
+                "amount_minor": 4_900_000,
+                "channel": Channel.INTERNET_BANKING.value,
+                "transaction_type": TransactionType.TRANSFER.value,
+                "ip_address": "185.199.110.56",
+                "geo_city": "Amsterdam",
+                "geo_country": "NL",
+            },
+        )
+    finally:
+        agent_env.service.investigator.investigate = original  # type: ignore[method-assign]
+    assert fail_resp.status_code == 200
+    failed = fail_resp.json()
+    assert failed["alert_id"] is not None
+    assert failed["investigation_id"] is None
+    stream_after = agent_env.client.get("/stream/events", params={"replay_recent": 10})
+    assert "event: investigation_failed" in stream_after.text

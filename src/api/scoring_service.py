@@ -611,20 +611,30 @@ class ScoringService:
                     and alert_id is not None
                     and score_res.risk_score >= self.settings.agent.auto_investigate_min_score
                 ):
-                    inv_payload = self.investigate_alert(alert_id)
-                    result["investigation_id"] = inv_payload.get("investigation_id")
+                    # Ajan hatası skorlama yanıtını asla düşürmez; alarm zaten kaydedilmiştir
+                    try:
+                        inv_payload = self.investigate_alert(alert_id, trigger="auto")
+                        result["investigation_id"] = inv_payload.get("investigation_id")
+                    except Exception:
+                        logger.exception("Otomatik soruşturma başarısız alert_id=%d; alarm OPEN kalır", alert_id)
+                        self.broadcaster.publish(
+                            "investigation_failed", {"alert_id": alert_id, "transaction_id": tx_id}
+                        )
         return result
 
     # ------------------------------------------------------------------ #
     # Otonom soruşturma
     # ------------------------------------------------------------------ #
-    def investigate_alert(self, alert_id: int) -> dict[str, Any]:
-        """İlgili alarm için otonom soruşturmayı çalıştırır, kaydeder ve SSE akışına yayınlar."""
+    def investigate_alert(self, alert_id: int, *, trigger: str = "manual") -> dict[str, Any]:
+        """İlgili alarm için otonom soruşturmayı çalıştırır, kaydeder ve SSE akışına yayınlar.
+
+        `trigger`: `manual` (API ucu) veya `auto` (eşik üstü kritik alarm) — yalnızca SSE olayına eklenir.
+        """
         if self.engine is None:
             raise KeyError(f"Alarm bulunamadı: {alert_id}")
         report = self.investigator.investigate(alert_id, persist=True)
         payload = report.model_dump(mode="json")
-        self.broadcaster.publish("investigation", payload)
+        self.broadcaster.publish("investigation", {**payload, "trigger": trigger})
         return payload
 
     def get_investigation(self, alert_id: int) -> dict[str, Any]:
