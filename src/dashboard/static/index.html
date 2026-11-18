@@ -3,13 +3,223 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AegisGraph — Finansal Güvenlik Operasyon Merkezi</title>
+  <title>AegisGraph — Finansal Güvenlik Operasyon Merkezi (SOC)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/cytoscape@3.30.2/dist/cytoscape.min.js"></script>
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
-<body class="bg-slate-950 text-slate-100">
-  <main id="app-root">
-    <h1>AegisGraph SOC Dashboard</h1>
-  </main>
+<body class="bg-slate-950 text-slate-100 antialiased selection:bg-cyan-500/30 selection:text-cyan-200">
+  <div class="soc-shell flex min-h-screen flex-col">
+    <!-- Üst Bar: Marka, Canlı Durum, KPI Kartları ve Demo Kontrolü -->
+    <header class="border-b border-slate-800/90 bg-slate-900/90 backdrop-blur sticky top-0 z-30">
+      <div class="mx-auto max-w-[1920px] px-4 py-3 flex flex-col gap-3">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-indigo-600 shadow-lg shadow-cyan-500/20 text-white font-bold text-lg">
+              AG
+            </div>
+            <div>
+              <div class="flex items-center gap-2.5">
+                <h1 class="text-base font-bold tracking-tight text-white">AegisGraph SOC</h1>
+                <span class="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[11px] font-medium text-cyan-300">
+                  Hibrit ML + Graf
+                </span>
+                <span id="sse-badge" class="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-800/80 px-2.5 py-0.5 text-xs font-medium text-slate-300">
+                  <span id="sse-indicator" class="h-2 w-2 rounded-full bg-amber-400 animate-pulse"></span>
+                  <span id="sse-status-text">SSE Bağlanıyor...</span>
+                </span>
+              </div>
+              <p class="text-xs text-slate-400">Gerçek Zamanlı Dolandırıcılık Tespiti, Ağ Analizi ve Otonom SAR Soruşturma Merkezi</p>
+            </div>
+          </div>
+
+          <!-- Canlı Demo Tetikleyici Butonlar -->
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold mr-1">Canlı Trafik Demo:</span>
+            <button data-scenario="NORMAL" data-count="10" class="sim-btn btn-demo-normal">
+              ▶ Normal Akış
+            </button>
+            <button data-scenario="FRAUD_RING" data-count="10" class="sim-btn btn-demo-ring">
+              ⚠️ Fraud Ring Saldırısı
+            </button>
+            <button data-scenario="ACCOUNT_TAKEOVER" data-count="6" class="sim-btn btn-demo-ato">
+              🔑 Account Takeover
+            </button>
+            <button data-scenario="CARD_TESTING" data-count="12" class="sim-btn btn-demo-ct">
+              💳 Card Testing
+            </button>
+          </div>
+        </div>
+
+        <!-- KPI Kartları -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+          <div class="kpi-card">
+            <div class="text-[11px] uppercase tracking-wider text-slate-400">Toplam İşlem</div>
+            <div class="mt-0.5 flex items-baseline justify-between">
+              <span id="kpi-total-tx" class="text-xl font-bold text-white tabular-nums">0</span>
+              <span class="text-[11px] text-cyan-400">Sıcak Graf Aktif</span>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="text-[11px] uppercase tracking-wider text-slate-400">Açık / İncelenen Alarm</div>
+            <div class="mt-0.5 flex items-baseline justify-between">
+              <span id="kpi-open-alerts" class="text-xl font-bold text-amber-400 tabular-nums">0</span>
+              <span class="text-[11px] text-slate-400">Eşik ≥ <span id="kpi-threshold">0.70</span></span>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="text-[11px] uppercase tracking-wider text-slate-400">Engellenen / Riskli Tutar</div>
+            <div class="mt-0.5 flex items-baseline justify-between">
+              <span id="kpi-blocked-amount" class="text-xl font-bold text-rose-400 tabular-nums">₺0,00</span>
+              <span class="text-[11px] text-rose-300/80">ALERT + BLOCK</span>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="text-[11px] uppercase tracking-wider text-slate-400">Ortalama Gecikme</div>
+            <div class="mt-0.5 flex items-baseline justify-between">
+              <span id="kpi-avg-latency" class="text-xl font-bold text-emerald-400 tabular-nums">0.0 ms</span>
+              <span class="text-[11px] text-emerald-300/80">Skor + SHAP</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Bildirim Çubuğu -->
+    <div id="toast-banner" class="hidden mx-auto mt-2 max-w-[1920px] w-full px-4">
+      <div id="toast-inner" class="rounded-lg border px-3 py-2 text-xs font-medium flex items-center justify-between">
+        <span id="toast-message"></span>
+        <button id="toast-close" class="ml-4 text-slate-400 hover:text-white">✕</button>
+      </div>
+    </div>
+
+    <!-- 3 Sütunlu Ana SOC Paneli (%30 / %40 / %30) -->
+    <main class="soc-grid mx-auto w-full max-w-[1920px] flex-1 gap-3 p-4">
+      <!-- SOL SÜTUN (%30): Canlı İşlem & Alarm Akışı -->
+      <section class="soc-panel flex flex-col overflow-hidden">
+        <div class="soc-panel-header">
+          <div>
+            <h2 class="text-sm font-semibold text-white">Canlı İşlem ve Alarm Akışı</h2>
+            <p class="text-[11px] text-slate-400">Maskeli IBAN • ML vs Graf Katkısı</p>
+          </div>
+          <div class="flex items-center gap-1 rounded-lg bg-slate-950/70 p-0.5 border border-slate-800">
+            <button data-filter="all" class="filter-tab is-active">Tümü</button>
+            <button data-filter="alerts" class="filter-tab">Alarmlar</button>
+            <button data-filter="investigations" class="filter-tab">SAR</button>
+          </div>
+        </div>
+        <div id="stream-list" class="soc-scroll flex-1 space-y-2 overflow-y-auto p-3">
+          <div class="text-center text-xs text-slate-500 py-10">
+            Canlı olay akışı bekleniyor... Üstten bir demo senaryosu başlatabilirsiniz.
+          </div>
+        </div>
+      </section>
+
+      <!-- ORTA SÜTUN (%40): Etkileşimli Dolandırıcılık Ağ Haritası (Cytoscape.js) -->
+      <section class="soc-panel flex flex-col overflow-hidden">
+        <div class="soc-panel-header flex-wrap gap-2">
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <h2 class="text-sm font-semibold text-white">Dolandırıcılık Ağ Haritası</h2>
+              <span id="graph-center-badge" class="rounded bg-rose-500/15 border border-rose-500/30 px-2 py-0.5 text-[11px] font-mono text-rose-300">
+                Hesap seçilmedi
+              </span>
+            </div>
+            <p id="graph-meta-summary" class="text-[11px] text-slate-400 mt-0.5">
+              İncelemek için soldaki listeden bir işlem veya alarm seçin.
+            </p>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <button id="btn-center-sender" class="hop-btn hidden" title="Gönderici hesaba odaklan">Gönderici</button>
+            <button id="btn-center-receiver" class="hop-btn hidden" title="Alıcı hesaba odaklan">Alıcı</button>
+            <div class="inline-flex rounded-lg bg-slate-950/80 p-0.5 border border-slate-800">
+              <button id="btn-hop-1" class="hop-btn">1-Hop</button>
+              <button id="btn-hop-2" class="hop-btn is-active">2-Hop</button>
+            </div>
+            <button id="btn-graph-fit" class="hop-btn" title="Grafı ekrana sığdır">Sığdır</button>
+          </div>
+        </div>
+
+        <!-- Renk & Şekil Lejantı -->
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 bg-slate-950/50 px-3 py-1.5 text-[11px] text-slate-300">
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-rose-500"></span>Hedef Hesap</span>
+            <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-blue-500"></span>İlişkili Hesap</span>
+            <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rotate-45 bg-purple-500 inline-block"></span>Ortak Cihaz</span>
+            <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 bg-slate-500 inline-block"></span>/24 IP Alt Ağı</span>
+          </div>
+          <span id="graph-cycle-pill" class="hidden rounded-full bg-rose-500/20 border border-rose-500/40 px-2 py-0.5 text-[10px] font-semibold text-rose-300">
+            Döngüsel Akış Tespit Edildi
+          </span>
+        </div>
+
+        <div class="relative flex-1 min-h-[420px] bg-slate-950/80">
+          <div id="cy" class="h-full w-full"></div>
+          <div id="graph-node-inspector" class="hidden absolute bottom-3 left-3 right-3 rounded-lg border border-slate-700/90 bg-slate-900/95 px-3 py-2 text-xs shadow-xl backdrop-blur"></div>
+        </div>
+      </section>
+
+      <!-- SAĞ SÜTUN (%30): SHAP Gerekçeleri ve Otonom Ajan Raporu (HITL) -->
+      <section class="soc-panel flex flex-col overflow-hidden">
+        <!-- Üst Yarı: SHAP Gerekçeleri -->
+        <div class="border-b border-slate-800/90 flex flex-col">
+          <div class="soc-panel-header">
+            <div>
+              <h2 class="text-sm font-semibold text-white">SHAP Açıklanabilirlik (Top-3)</h2>
+              <p id="shap-subtitle" class="text-[11px] text-slate-400">Model kararını yukarı çeken ana faktörler</p>
+            </div>
+            <span id="selected-score-pill" class="rounded-md bg-slate-800 px-2 py-0.5 text-xs font-mono text-slate-300">
+              —
+            </span>
+          </div>
+          <div id="shap-container" class="p-3 space-y-2.5">
+            <div class="text-xs text-slate-500 py-4 text-center">
+              SHAP katkı analizi için sol sütundan bir kayıt seçin.
+            </div>
+          </div>
+        </div>
+
+        <!-- Alt Yarı: Otonom Ajan Raporu & Analist Kararları -->
+        <div class="flex flex-1 flex-col overflow-hidden">
+          <div class="soc-panel-header">
+            <div>
+              <h2 class="text-sm font-semibold text-white">Otonom Ajan SAR Raporu</h2>
+              <p class="text-[11px] text-slate-400">Kanıt Zinciri • Human-in-the-Loop</p>
+            </div>
+            <button id="btn-run-agent" disabled class="rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed transition">
+              🤖 Ajanı Başlat
+            </button>
+          </div>
+
+          <div id="agent-report-container" class="soc-scroll flex-1 space-y-3 overflow-y-auto p-3 text-xs">
+            <div class="text-slate-500 py-8 text-center">
+              Seçili bir alarmın otonom soruşturma raporu burada görüntülenir.
+            </div>
+          </div>
+
+          <!-- İnsan Analist Onay / Karar Çubuğu -->
+          <div class="border-t border-slate-800 bg-slate-900/90 p-3">
+            <div class="mb-2 flex items-center justify-between text-[11px] text-slate-400">
+              <span>Analist Nihai Kararı (HITL)</span>
+              <span id="alert-status-label" class="font-mono text-slate-300">Durum: —</span>
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+              <button id="btn-decision-block" disabled data-status="CONFIRMED_FRAUD" class="decision-btn btn-block">
+                🛑 Hesabı Bloke Et
+              </button>
+              <button id="btn-decision-freeze" disabled data-status="ESCALATED" class="decision-btn btn-freeze">
+                ❄️ İşlemi Dondur
+              </button>
+              <button id="btn-decision-fp" disabled data-status="FALSE_POSITIVE" class="decision-btn btn-fp">
+                ✅ Yanlış Alarm
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
   <script src="/static/app.js"></script>
 </body>
 </html>

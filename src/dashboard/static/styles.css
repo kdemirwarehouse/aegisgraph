@@ -1,0 +1,224 @@
+/* AegisGraph SOC Dashboard — Koyu Tema Stilleri */
+
+:root {
+  color-scheme: dark;
+}
+
+.soc-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 1024px) {
+  .soc-grid {
+    grid-template-columns: minmax(0, 30fr) minmax(0, 40fr) minmax(0, 30fr);
+    height: calc(100vh - 148px);
+    min-height: 640px;
+  }
+}
+
+.soc-panel {
+  border-radius: 0.75rem;
+  border: 1px solid rgba(51, 65, 85, 0.75);
+  background: rgba(15, 23, 42, 0.78);
+  box-shadow: 0 10px 30px rgba(2, 6, 23, 0.45);
+}
+
+.soc-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.75);
+  background: rgba(15, 23, 42, 0.95);
+}
+
+.kpi-card {
+  border-radius: 0.65rem;
+  border: 1px solid rgba(51, 65, 85, 0.7);
+  background: rgba(2, 6, 23, 0.55);
+  padding: 0.5rem 0.75rem;
+}
+
+.sim-btn {
+  border-radius: 0.5rem;
+  padding: 0.38rem 0.68rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.sim-btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.btn-demo-normal {
+  background: rgba(16, 185, 129, 0.14);
+  border-color: rgba(16, 185, 129, 0.35);
+  color: #6ee7b7;
+}
+.btn-demo-normal:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.25);
+}
+
+.btn-demo-ring {
+  background: rgba(244, 63, 94, 0.14);
+  border-color: rgba(244, 63, 94, 0.4);
+  color: #fda4af;
+}
+.btn-demo-ring:hover:not(:disabled) {
+  background: rgba(244, 63, 94, 0.26);
+}
+
+.btn-demo-ato {
+  background: rgba(245, 158, 11, 0.14);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #fcd34d;
+}
+.btn-demo-ato:hover:not(:disabled) {
+  background: rgba(245, 158, 11, 0.26);
+}
+
+.btn-demo-ct {
+  background: rgba(168, 85, 247, 0.15);
+  border-color: rgba(168, 85, 247, 0.4);
+  color: #d8b4fe;
+}
+.btn-demo-ct:hover:not(:disabled) {
+  background: rgba(168, 85, 247, 0.26);
+}
+
+.filter-tab,
+.hop-btn {
+  border-radius: 0.4rem;
+  padding: 0.22rem 0.55rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #94a3b8;
+  transition: all 0.15s ease;
+}
+
+.filter-tab.is-active,
+.hop-btn.is-active {
+  background: rgba(6, 182, 212, 0.2);
+  color: #67e8f9;
+  border: 1px solid rgba(6, 182, 212, 0.35);
+}
+
+.hop-btn {
+  border: 1px solid rgba(51, 65, 85, 0.8);
+}
+
+.stream-card {
+  border-radius: 0.6rem;
+  border: 1px solid rgba(51, 65, 85, 0.75);
+  background: rgba(2, 6, 23, 0.62);
+  padding: 0.65rem 0.75rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
+}
+
+.stream-card:hover {
+  border-color: rgba(56, 189, 248, 0.45);
+  background: rgba(15, 23, 42, 0.9);
+}
+
+.stream-card.is-selected {
+  border-color: rgba(34, 211, 238, 0.85);
+  background: rgba(8, 47, 73, 0.35);
+  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.3);
+}
+
+.badge-decision {
+  border-radius: 9999px;
+  padding: 0.1rem 0.48rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.decision-ALLOW {
+  background: rgba(16, 185, 129, 0.16);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.decision-REVIEW {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fcd34d;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.decision-ALERT {
+  background: rgba(249, 115, 22, 0.18);
+  color: #fdba74;
+  border: 1px solid rgba(249, 115, 22, 0.45);
+}
+
+.decision-BLOCK {
+  background: rgba(244, 63, 94, 0.22);
+  color: #fda4af;
+  border: 1px solid rgba(244, 63, 94, 0.55);
+}
+
+.decision-btn {
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-align: center;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.decision-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.btn-block {
+  background: rgba(244, 63, 94, 0.18);
+  border-color: rgba(244, 63, 94, 0.45);
+  color: #fecdd3;
+}
+.btn-block:hover:not(:disabled) {
+  background: rgba(244, 63, 94, 0.32);
+}
+
+.btn-freeze {
+  background: rgba(56, 189, 248, 0.16);
+  border-color: rgba(56, 189, 248, 0.45);
+  color: #bae6fd;
+}
+.btn-freeze:hover:not(:disabled) {
+  background: rgba(56, 189, 248, 0.28);
+}
+
+.btn-fp {
+  background: rgba(16, 185, 129, 0.16);
+  border-color: rgba(16, 185, 129, 0.45);
+  color: #a7f3d0;
+}
+.btn-fp:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.28);
+}
+
+.soc-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.soc-scroll::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5);
+}
+.soc-scroll::-webkit-scrollbar-thumb {
+  background: rgba(71, 85, 105, 0.7);
+  border-radius: 9999px;
+}
+.soc-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.9);
+}
