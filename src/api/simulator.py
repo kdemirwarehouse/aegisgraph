@@ -13,7 +13,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 import numpy as np
@@ -26,6 +26,15 @@ from src.database.db import get_engine, load_table, session_scope
 from src.database.models import AccountType, Channel, Transaction, TransactionType
 
 logger = logging.getLogger(__name__)
+
+SimulatorScenario = Literal["ALL", "NORMAL", "FRAUD_RING", "ACCOUNT_TAKEOVER", "CARD_TESTING"]
+VALID_SIMULATOR_SCENARIOS: tuple[str, ...] = (
+    "ALL",
+    "NORMAL",
+    "FRAUD_RING",
+    "ACCOUNT_TAKEOVER",
+    "CARD_TESTING",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -297,10 +306,20 @@ class TrafficSimulator:
         count: int = 20,
         *,
         fraud_ratio: float | None = None,
+        scenario: str = "ALL",
     ) -> list[SimulatedTransaction]:
         """Normal ve fraud senaryolarından oluşan kronolojik işlem listesi üretir."""
+        normalized = str(scenario).upper()
+        if normalized not in VALID_SIMULATOR_SCENARIOS:
+            raise ValueError(
+                f"Geçersiz simülasyon senaryosu: {scenario!r}. "
+                f"Beklenenler: {', '.join(VALID_SIMULATOR_SCENARIOS)}"
+            )
         if count <= 0:
             return []
+        if normalized != "ALL":
+            return self._build_single_scenario(normalized, count)
+
         ratio = self.settings.api.simulator_fraud_ratio if fraud_ratio is None else fraud_ratio
         n_fraud_target = min(count, max(0, round(count * ratio)))
         n_normal = count - n_fraud_target
@@ -312,6 +331,19 @@ class TrafficSimulator:
             stream.extend(self._rebuild_chronological_frauds(n_fraud_target))
         stream.extend(self._make_normal() for _ in range(normal_after))
         return stream[:count]
+
+    def _build_single_scenario(self, scenario: str, count: int) -> list[SimulatedTransaction]:
+        if scenario == "NORMAL":
+            return [self._make_normal() for _ in range(count)]
+        builder = {
+            "FRAUD_RING": self._make_fraud_ring,
+            "ACCOUNT_TAKEOVER": self._make_account_takeover,
+            "CARD_TESTING": self._make_card_testing,
+        }[scenario]
+        events: list[SimulatedTransaction] = []
+        while len(events) < count:
+            events.extend(builder())
+        return events[:count]
 
     def _rebuild_chronological_frauds(self, target: int) -> list[SimulatedTransaction]:
         events: list[SimulatedTransaction] = []

@@ -11,10 +11,11 @@ import asyncio
 import contextlib
 import logging
 import threading
+import time
 from collections import deque
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -25,6 +26,7 @@ from sqlalchemy import Engine, func, or_, select
 
 from config.settings import Settings, get_settings
 from src.agent.investigator import FraudInvestigatorAgent
+from src.api.simulator import VALID_SIMULATOR_SCENARIOS, TrafficSimulator
 from src.database.db import get_engine, init_db, session_scope
 from src.database.models import (
     GROUND_TRUTH_COLUMNS,
@@ -218,6 +220,8 @@ class ScoringService:
             settings=self.settings,
         )
         self._lock = threading.RLock()
+        self._sim_lock = threading.Lock()
+        self._sim_seq = 0
         self._tx_seq = self._init_tx_sequence()
 
     @classmethod
@@ -570,15 +574,20 @@ class ScoringService:
         )
 
         if update_state:
+            s_masked = mask_iban(sender_iban)
+            r_masked = mask_iban(receiver_iban)
             stream_payload = {
                 "transaction_id": tx_id,
                 "timestamp": result["timestamp"],
                 "sender_account_id": sender,
                 "receiver_account_id": receiver,
+                "sender_masked_iban": s_masked,
+                "receiver_masked_iban": r_masked,
                 "amount": result["amount"],
                 "currency": currency,
                 "channel": channel_enum.value,
                 "risk_score": result["risk_score"],
+                "ml_score": ml_score,
                 "graph_score": graph_score,
                 "decision": decision.value,
                 "is_alert": score_res.is_alert,
@@ -596,9 +605,12 @@ class ScoringService:
                         "timestamp": result["timestamp"],
                         "sender_account_id": sender,
                         "receiver_account_id": receiver,
+                        "sender_masked_iban": s_masked,
+                        "receiver_masked_iban": r_masked,
                         "amount": result["amount"],
                         "currency": currency,
                         "risk_score": result["risk_score"],
+                        "ml_score": ml_score,
                         "graph_score": graph_score,
                         "decision": decision.value,
                         "status": AlertStatus.OPEN.value,
@@ -644,10 +656,97 @@ class ScoringService:
         report = self.investigator.get_report(alert_id)
         return report.model_dump(mode="json")
 
+    def run_simulation(
+        self,
+        *,
+        scenario: str = "ALL",
+        count: int = 15,
+        tps: float | None = None,
+    ) -> dict[str, Any]:
+        """Seçilen senaryo için trafik simülasyonu üretir ve işlemleri canlı skorlama akışına basar."""
+        normalized = str(scenario).upper()
+        if normalized not in VALID_SIMULATOR_SCENARIOS:
+            raise ValueError(f"Geçersiz simülasyon senaryosu: {scenario!r}")
+        if self.engine is None:
+            raise RuntimeError("Simülasyon için veritabanı bağlantısı gereklidir")
+
+        resolved_tps = tps or self.settings.api.simulator_tps
+        interval = 1.0 / resolved_tps if resolved_tps > 0 else 0.0
+
+        with self._sim_lock:
+            with self._lock:
+                self._sim_seq += 1
+                seed = self.settings.generator.seed + self._sim_seq
+                last_ts = self.extractor.last_timestamp
+                base_ts = (
+                    datetime.fromtimestamp(last_ts, tz=UTC).replace(tzinfo=None) + timedelta(minutes=1)
+                    if last_ts is not None
+                    else self.settings.generator.start_date + timedelta(days=31)
+                )
+
+            simulator = TrafficSimulator.from_database(
+                self.engine,
+                base_timestamp=base_ts,
+                seed=seed,
+                settings=self.settings,
+            )
+            stream = simulator.build_stream(count=count, scenario=normalized)
+
+            succeeded = 0
+            alerts_triggered = 0
+            investigations_triggered = 0
+            for idx, item in enumerate(stream):
+                t_start = time.perf_counter()
+                res = self.score_transaction(item.payload, update_state=True, persist=True)
+                succeeded += 1
+                if res.get("is_alert"):
+                    alerts_triggered += 1
+                if res.get("investigation_id") is not None:
+                    investigations_triggered += 1
+                if idx + 1 < len(stream) and interval > 0:
+                    wait_sec = interval - (time.perf_counter() - t_start)
+                    if wait_sec > 0:
+                        time.sleep(wait_sec)
+
+        logger.info(
+            "Simülasyon akışı tamamlandı senaryo=%s işlem=%d alarm=%d soruşturma=%d",
+            normalized,
+            succeeded,
+            alerts_triggered,
+            investigations_triggered,
+        )
+        return {
+            "scenario": normalized,
+            "total_sent": len(stream),
+            "succeeded": succeeded,
+            "alerts_triggered": alerts_triggered,
+            "investigations_triggered": investigations_triggered,
+        }
+
     # ------------------------------------------------------------------ #
     # Alert sorgulama & durum güncelleme
     # ------------------------------------------------------------------ #
-    def _serialize_alert(self, alert: Alert, tx: Transaction | None) -> dict[str, Any]:
+    def _fetch_iban_map(self, session: Any, txs: list[Transaction | None]) -> dict[str, str]:
+        acc_ids = {
+            acc_id
+            for tx in txs
+            if tx is not None
+            for acc_id in (tx.sender_account_id, tx.receiver_account_id)
+        }
+        if not acc_ids:
+            return {}
+        rows = session.execute(
+            select(Account.account_id, Account.iban).where(Account.account_id.in_(acc_ids))
+        ).all()
+        return {str(acc_id): str(iban) for acc_id, iban in rows}
+
+    def _serialize_alert(
+        self,
+        alert: Alert,
+        tx: Transaction | None,
+        iban_map: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        ibans = iban_map or {}
         return {
             "alert_id": alert.alert_id,
             "transaction_id": alert.transaction_id,
@@ -662,6 +761,8 @@ class ScoringService:
             "resolution_note": alert.resolution_note,
             "sender_account_id": tx.sender_account_id if tx else None,
             "receiver_account_id": tx.receiver_account_id if tx else None,
+            "sender_masked_iban": mask_iban(ibans.get(tx.sender_account_id)) if tx else None,
+            "receiver_masked_iban": mask_iban(ibans.get(tx.receiver_account_id)) if tx else None,
             "amount_minor": int(tx.amount_minor) if tx else None,
             "amount": float(tx.amount_minor) / 100.0 if tx else None,
             "currency": tx.currency if tx else None,
@@ -717,7 +818,8 @@ class ScoringService:
                 .limit(resolved_limit)
             )
             rows = session.execute(rows_stmt).all()
-            items = [self._serialize_alert(alert, tx) for alert, tx in rows]
+            iban_map = self._fetch_iban_map(session, [tx for _, tx in rows])
+            items = [self._serialize_alert(alert, tx, iban_map) for alert, tx in rows]
 
         return {"total": total, "limit": resolved_limit, "offset": offset, "items": items}
 
@@ -733,7 +835,8 @@ class ScoringService:
             ).first()
             if row is None:
                 raise KeyError(f"Alarm bulunamadı: {alert_id}")
-            return self._serialize_alert(row[0], row[1])
+            iban_map = self._fetch_iban_map(session, [row[1]])
+            return self._serialize_alert(row[0], row[1], iban_map)
 
     def update_alert_status(
         self,
@@ -763,7 +866,8 @@ class ScoringService:
             if resolution_note is not None:
                 alert.resolution_note = resolution_note
             session.flush()
-            updated = self._serialize_alert(alert, tx)
+            iban_map = self._fetch_iban_map(session, [tx])
+            updated = self._serialize_alert(alert, tx, iban_map)
 
         self.broadcaster.publish("alert_updated", updated)
         return updated

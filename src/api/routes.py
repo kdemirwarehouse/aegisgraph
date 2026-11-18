@@ -8,11 +8,12 @@ import time
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, IPvAnyAddress, model_validator
 
 from src.api.scoring_service import Decision, ScoringService, StreamEvent
+from src.api.simulator import SimulatorScenario
 from src.database.models import (
     AlertStatus,
     Channel,
@@ -137,6 +138,8 @@ class AlertItemModel(BaseModel):
     resolution_note: str | None
     sender_account_id: str | None
     receiver_account_id: str | None
+    sender_masked_iban: str | None = None
+    receiver_masked_iban: str | None = None
     amount_minor: int | None
     amount: float | None
     currency: str | None
@@ -210,6 +213,24 @@ class HealthResponse(BaseModel):
     alert_threshold: float
     review_threshold: float
     block_threshold: float
+
+
+class SimulatorRunRequest(BaseModel):
+    """Dashboard veya API üzerinden canlı demo simülasyonunu tetikleme isteği."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    scenario: SimulatorScenario = "ALL"
+    count: int = Field(default=15, ge=1, le=100)
+    tps: float | None = Field(default=None, gt=0.0, le=500.0)
+
+
+class SimulatorRunResponse(BaseModel):
+    status: Literal["started"]
+    scenario: SimulatorScenario
+    count: int
+    tps: float
+    message: str
 
 
 # --------------------------------------------------------------------------- #
@@ -442,3 +463,31 @@ def get_account_graph(
     except KeyError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return AccountGraphResponse(**data)
+
+
+@router.post("/simulator/run", response_model=SimulatorRunResponse, tags=["simülatör"])
+def trigger_simulation(
+    payload: SimulatorRunRequest,
+    background_tasks: BackgroundTasks,
+    service: ServiceDep,
+) -> SimulatorRunResponse:
+    """Seçilen senaryo için `TrafficSimulator` akışını arka plan görevi olarak başlatır."""
+    if service.engine is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Simülasyon için veritabanı bağlantısı hazır değil",
+        )
+    resolved_tps = payload.tps or service.settings.api.simulator_tps
+    background_tasks.add_task(
+        service.run_simulation,
+        scenario=payload.scenario,
+        count=payload.count,
+        tps=resolved_tps,
+    )
+    return SimulatorRunResponse(
+        status="started",
+        scenario=payload.scenario,
+        count=payload.count,
+        tps=resolved_tps,
+        message=f"{payload.scenario} senaryosu için {payload.count} işlemlik canlı akış başlatıldı.",
+    )
