@@ -1,4 +1,4 @@
-"""Gün 2 testleri: sızıntısız özellikler, train/serve tutarlılığı, model performansı, SHAP, alert yazımı."""
+"""Özellik ve model testleri: sızıntısız özellikler, train/serve tutarlılığı, model performansı, SHAP, alert yazımı."""
 
 from __future__ import annotations
 

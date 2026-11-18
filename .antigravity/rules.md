@@ -32,7 +32,7 @@ Bu dosya, projede çalışan her IDE ajanı / SDK için bağlayıcıdır. Mimari
 - Tüm rastgelelik seed'li `numpy.random.Generator` ile.
 - Yeni senaryo/özellik ⇒ pytest testi zorunlu. `pytest` yeşil olmadan iş bitmiş sayılmaz.
 - PII: veri tamamen sentetik; gerçek müşteri verisi repoya ve loglara girmez. Loglarda IBAN maskelenir
-  (Gün 3+ API katmanında `TR** **** **** **** **** **12 34` formatı).
+  (API ve ajan katmanında `TR** **** **** **** **** **12 34` formatı; hesap sahibi adı `mask_holder_name` ile).
 
 ## 5. Ajan kuralları
 - Ajan karar vermez, **öneri** üretir; `CONFIRMED_FRAUD` / blok kararı insan analist onayı gerektirir.

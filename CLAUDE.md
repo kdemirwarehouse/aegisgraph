@@ -71,14 +71,20 @@ okuyarak başlar. Mimari kararlar burada; ayrıntılı domain kuralları `.antig
 ## Otonom soruşturma ajanı mimarisi
 - `InvestigationToolkit` (`src/agent/tools.py`): salt-okunur ve deterministik kanıt araçları
   (`get_account_profile`, `get_recent_transactions`, `get_network_connections`, `get_alert_evidence`).
-  Tüm çıktılarda `mask_iban` uygulanır ve `GROUND_TRUTH_COLUMNS` dışlanır.
+  Tüm çıktılarda `mask_iban` uygulanır, hesap sahibi adı `mask_holder_name` ile maskelenir, her çıktı son
+  olarak `redact_ibans` süzgecinden geçer ve `GROUND_TRUTH_COLUMNS` dışlanır. `reference_time` ile point-in-time
+  çalışır (alarm anından sonraki işlem/alarm görülmez); liste sınırları `settings.agent.max_evidence_ids`.
 - `FraudInvestigatorAgent` (`src/agent/investigator.py`): varsayılan `local` kural-kanıt sentezleyicisi
   (veya opsiyonel LLM sağlayıcı) ile tipoloji sınıflandırması, kaynak işlem/cihaz/IP kimliklerine dayalı
   `evidence_chain`, MASAK/SAR formatında Türkçe `executive_summary_tr` ve `InvestigationReport` üretir.
+  Tipoloji/aksiyon eşiklerinin tamamı `AgentSettings` alanlarıdır; ajan koduna sabit eşik yazılmaz.
+  LLM modu (`provider="openai"`, `llm_base_url`, `llm_timeout_seconds`) yalnızca özeti zenginleştirir; çıktısı
+  `redact_ibans` ile süzülür, HITL notu korunur, hata durumunda yerel özete dönülür.
 - **Human-in-the-Loop:** `requires_human_approval=True` daima zorunludur; raporlar `investigations`
   tablosuna kaydedilir ve `alerts` tablosu asla otomatik `CONFIRMED_FRAUD` durumuna alınmaz.
 - `ScoringService`, `risk_score >= settings.agent.auto_investigate_min_score` olan alarmlarda
-  soruşturmayı otomatik tetikleyip SSE akışına `investigation` olayı yayınlar.
+  soruşturmayı otomatik tetikleyip SSE akışına `investigation` olayı (`trigger`: `auto`/`manual`) yayınlar.
+  Ajan hatası skorlama yanıtını düşürmez: alarm `OPEN` kalır ve `investigation_failed` olayı yayınlanır.
 - Sentetik veride "hard negative"lar (meşru seyahat/VPN, telefon değişimi, aile cihazı, mikro-ödeme
   seansı, yeni meşru hesaplar) ve zor fraud (yurt içi saldırgan, devşirilmiş eski mule hesapları) vardır;
   bunlar kaldırılırsa model tek-özellik kısayolları öğrenir.

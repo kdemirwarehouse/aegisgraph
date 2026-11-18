@@ -420,7 +420,7 @@ def main(argv: list[str] | None = None) -> int:
                           cfg=settings.model, alert_threshold=settings.FRAUD_THRESHOLD)
     out_dir = settings.model.artifacts_dir
     save_artifacts(result, out_dir)
-    extractor.save(out_dir / "feature_extractor.joblib")  # Gün 3 online skorlama için sıcak durum
+    extractor.save(out_dir / "feature_extractor.joblib")  # online skorlama için sıcak durum
 
     print((out_dir / "report.md").read_text(encoding="utf-8"))
     if not args.no_alerts:

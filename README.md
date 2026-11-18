@@ -79,7 +79,7 @@ python -m src.api.simulator --count 30 --tps 5  # normal + fraud senaryolarını
 
 API uçları:
 - `POST /transactions/score` — Tekil işlemi milisaniyeler içinde skorlar, graf payı ve SHAP top-3 gerekçeleri döner
-- `GET /stream/events` — Yeni işlemleri, alarmları ve otonom soruşturmaları Server-Sent Events (SSE) ile canlı yayınlar
+- `GET /stream/events` — Yeni işlemleri (`transaction`), alarmları (`alert`) ve otonom soruşturmaları (`investigation`, `investigation_failed`) Server-Sent Events (SSE) ile canlı yayınlar
 - `GET /alerts`, `GET/PATCH /alerts/{alert_id}` — Alarmları filtreler, görüntüler ve durum günceller
 - `POST /alerts/{alert_id}/investigate` — İlgili alarm için otonom soruşturmayı başlatır ve SAR raporunu kaydeder
 - `GET /alerts/{alert_id}/investigation` — Kayıtlı otonom soruşturma (SAR) raporunu döndürür
@@ -90,7 +90,13 @@ API uçları:
 Kritik alarmlarda (`AEGIS_AGENT__AUTO_INVESTIGATE_MIN_SCORE`, varsayılan `0.85`) otomatik tetiklenen veya `POST /alerts/{alert_id}/investigate` ile çağrılan `FraudInvestigatorAgent` (`src/agent/`), salt-okunur kanıt araçlarıyla (`get_alert_evidence`, `get_account_profile`, `get_recent_transactions`, `get_network_connections`) delil zinciri toplar, tüm IBAN'ları maskeler ve Türkçe MASAK/SAR formatında rapor üretir:
 
 - **Tipolojiler:** `FRAUD_RING`, `ACCOUNT_TAKEOVER`, `MONEY_MULE`, `CARD_TESTING`, `ANOMALOUS_ACTIVITY`
-- **Human-in-the-Loop:** Önerilen aksiyonlar (`BLOCK_ACCOUNT`, `FREEZE_TX`, `ENHANCED_DUE_DILIGENCE`, `FALSE_POSITIVE_DISMISS`) daima `requires_human_approval=true` ile insan analist onayına sunulur.
+- **Human-in-the-Loop:** Önerilen aksiyonlar (`BLOCK_ACCOUNT`, `FREEZE_TX`, `ENHANCED_DUE_DILIGENCE`, `FALSE_POSITIVE_DISMISS`) daima `requires_human_approval=true` ile insan analist onayına sunulur; alarm en fazla `INVESTIGATING` durumuna alınır, asla otomatik `CONFIRMED_FRAUD` olmaz.
+- **Rapor alanları (`InvestigationReport`):** `alert_id`, `tx_id`, `suspected_typology`, `confidence_score`, `executive_summary_tr`, `evidence_chain` (kaynak işlem/cihaz/IP kimlikli), `related_accounts`, `recommended_action`, `tool_trace`. Raporlar `investigations` tablosunda saklanır.
+- **KVKK / gizlilik:** IBAN'lar `mask_iban` ile (`TR** **** **** **** **** **12 34`), hesap sahibi adları `mask_holder_name` ile maskelenir; tüm araç, rapor ve LLM çıktıları ayrıca `redact_ibans` süzgecinden geçer.
+- **Point-in-time:** Araçlar yalnızca alarm anına kadarki veriyi kullanır; ground-truth etiketlerine hiçbir koşulda erişmez.
+- **Sağlayıcı:** Varsayılan `local` mod harici API anahtarı gerektirmeden deterministik kanıt sentezi yapar. Opsiyonel OpenAI uyumlu LLM modu (`AEGIS_AGENT__PROVIDER=openai`, `AEGIS_AGENT__API_KEY`, `AEGIS_AGENT__LLM_BASE_URL`) yalnızca yönetici özetini zenginleştirir; hata durumunda yerel özete dönülür.
+- **Dayanıklılık:** Otomatik soruşturma başarısız olursa skorlama yanıtı etkilenmez; alarm `OPEN` kalır ve SSE akışına `investigation_failed` olayı düşer.
+- **Ayarlar:** Tüm eşikler (`max_tool_steps`, `history_lookback_days`, `mule_min_fan_in`, `card_testing_min_burst`, `min_typology_signal`, `block_min_confidence` vb.) `config/settings.py` → `AgentSettings` (`settings.agent`) altındadır.
 
 ## Veri modeli
 

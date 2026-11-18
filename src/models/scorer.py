@@ -1,7 +1,7 @@
 """Risk skorlama ve SHAP açıklamalı Alert üretimi.
 
 Batch:   `write_alerts(scorer, X, engine)` → eşik üstü işlemler `alerts` tablosuna
-Online:  `scorer.score_transaction(extractor, tx)` → tek işlem, milisaniye mertebesinde (Gün 3 API)
+Online:  `scorer.score_transaction(extractor, tx)` → tek işlem, milisaniye mertebesinde (FastAPI skorlama servisi)
 """
 
 from __future__ import annotations
