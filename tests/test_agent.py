@@ -210,6 +210,23 @@ def test_tools_mask_iban_and_never_leak_ground_truth(agent_env: AgentTestEnv) ->
     assert MASKED_IBAN_RE.match(ev["transaction"]["sender_masked_iban"])
     assert MASKED_IBAN_RE.match(ev["transaction"]["receiver_masked_iban"])
     assert MASKED_IBAN_RE.match(profile["masked_iban"])
+    assert recent["transactions"], "Son işlem listesi boş olmamalı"
+    for tx in recent["transactions"]:
+        assert MASKED_IBAN_RE.match(tx["counterparty_masked_iban"])
+
+    # KVKK: ham hesap sahibi adı dönmez, yalnızca maskeli hali döner
+    raw_holder = agent_env.dataset.accounts.set_index("account_id").loc[sender, "holder_name"]
+    assert "holder_name" not in profile
+    assert profile["holder_name_masked"] == mask_holder_name(raw_holder)
+    assert raw_holder not in json.dumps(profile, ensure_ascii=False, default=str)
+
+    # Point-in-time: referans andan önceki profil, sonraki alarmları görmez
+    early_profile = get_account_profile(
+        sender, engine=agent_env.engine, reference_time=ref_time - timedelta(seconds=1)
+    )
+    assert alert_id not in early_profile["alert_ids"]
+    assert alert_id in profile["alert_ids"]
+    assert len(profile["alert_ids"]) <= agent_env.settings.agent.max_evidence_ids
 
     for tool_output in (ev, profile, recent, network):
         serialized = json.dumps(tool_output, ensure_ascii=False, default=str)
