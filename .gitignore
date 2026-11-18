@@ -19,13 +19,16 @@ venv/
 # Ortam / gizli bilgiler
 .env
 
-# Model artefaktları (Gün 2+) — ikili dosyalar yeniden üretilebilir; rapor ve metrikler versiyonlanır
+# Model artefaktları — ikili dosyalar yeniden üretilebilir; rapor ve metrikler versiyonlanır
 artifacts/*
 !artifacts/report.md
 !artifacts/metrics.json
 !artifacts/feature_importance.csv
 *.pkl
 *.joblib
+
+# Dokümantasyon görselleri takip edilir
+!docs/assets/*.png
 
 # IDE
 .vscode/

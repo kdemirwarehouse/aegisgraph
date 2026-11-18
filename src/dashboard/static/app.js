@@ -11,11 +11,13 @@
     selectedTxId: null,
     selectedAccountId: null,
     graphHops: 2,
+    graphReqSeq: 0,
     baseTxCount: 0,
     liveTxCount: 0,
     baseOpenOverflow: 0,
     blockedAmountTry: 0,
     latenciesMs: [],
+    seenLatencyTxIds: new Set(),
     alertThreshold: 0.7,
     blockThreshold: 0.9,
     reviewThreshold: 0.5,
@@ -513,6 +515,7 @@
 
   async function loadGraph(accountId, hops = state.graphHops) {
     if (!accountId) return;
+    const reqId = ++state.graphReqSeq;
     state.selectedAccountId = accountId;
     state.graphHops = hops;
     els.btnHop1.classList.toggle("is-active", hops === 1);
@@ -521,9 +524,11 @@
     els.graphInspector.classList.add("hidden");
 
     try {
-      const resp = await fetch(`/graph/${encodeURIComponent(accountId)}?hops=${hops}&max_nodes=80`);
+      const nodeLimit = hops === 1 ? 28 : 65;
+      const resp = await fetch(`/graph/${encodeURIComponent(accountId)}?hops=${hops}&max_nodes=${nodeLimit}`);
       if (!resp.ok) throw new Error(`Graf yüklenemedi (${resp.status})`);
       const graph = await resp.json();
+      if (reqId !== state.graphReqSeq) return;
 
       els.graphMetaSummary.textContent =
         `${graph.node_count} düğüm • ${graph.edge_count} kenar • Ortak cihaz hesabı: ${graph.shared_device_accounts.length} • Ortak IP hesabı: ${graph.shared_ip_accounts.length}`;
@@ -560,16 +565,17 @@
 
       state.cy.elements().remove();
       state.cy.add(elements);
+      state.cy.resize();
       state.cy
         .layout({
           name: "cose",
           animate: false,
-          padding: 28,
-          nodeRepulsion: 6500,
-          idealEdgeLength: 95,
+          padding: 32,
+          nodeRepulsion: 5000,
+          idealEdgeLength: 90,
         })
         .run();
-      state.cy.fit(undefined, 28);
+      state.cy.fit(undefined, 32);
     } catch (err) {
       els.graphMetaSummary.textContent = err.message || "Graf yüklenemedi.";
     }
@@ -721,10 +727,11 @@
       const existed = state.itemsByTx.has(payload.transaction_id);
       if (!existed) {
         state.liveTxCount += 1;
-        if (payload.latency_ms !== undefined) {
-          state.latenciesMs.push(Number(payload.latency_ms));
-          if (state.latenciesMs.length > 200) state.latenciesMs.shift();
-        }
+      }
+      if (payload.latency_ms !== undefined && !state.seenLatencyTxIds.has(payload.transaction_id)) {
+        state.seenLatencyTxIds.add(payload.transaction_id);
+        state.latenciesMs.push(Number(payload.latency_ms));
+        if (state.latenciesMs.length > 200) state.latenciesMs.shift();
       }
       upsertStreamItem(payload);
       renderStream();
@@ -764,7 +771,7 @@
 
   function connectSse() {
     if (state.sse) state.sse.close();
-    const sse = new EventSource("/stream/events?replay_recent=25");
+    const sse = new EventSource("/stream/events?replay_recent=60");
     state.sse = sse;
 
     sse.onopen = () => {

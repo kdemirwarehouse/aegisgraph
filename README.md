@@ -2,6 +2,9 @@
 
 Hibrit (ML + Graf Analizi) ve otonom gerçek zamanlı dolandırıcılık tespit sistemi.
 
+![AegisGraph Live SOC Dashboard](docs/assets/dashboard_showcase.png)
+*Canlı SOC Dashboard: Gerçek zamanlı SSE işlem/alarm akışı (sol), Cytoscape.js dolandırıcılık halkası ağ haritası (orta), Türkçe SHAP top-3 risk faktörleri ve Otonom Ajan MASAK/SAR soruşturma raporu (sağ).*
+
 Klasik kural motorları ve tekil işlem modelleri, koordineli dolandırıcılığı (fraud halkaları, mule ağları, paylaşılan cihazlar) göremez. AegisGraph her işlemi iki açıdan değerlendirir:
 
 1. **ML skoru:** İşlem ve hesap davranışı özellikleri üzerinde LightGBM

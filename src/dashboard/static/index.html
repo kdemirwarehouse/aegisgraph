@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body class="bg-slate-950 text-slate-100 antialiased selection:bg-cyan-500/30 selection:text-cyan-200">
-  <div class="soc-shell flex min-h-screen flex-col">
+  <div class="soc-shell flex flex-col">
     <!-- Üst Bar: Marka, Canlı Durum, KPI Kartları ve Demo Kontrolü -->
     <header class="border-b border-slate-800/90 bg-slate-900/90 backdrop-blur sticky top-0 z-30">
       <div class="mx-auto max-w-[1920px] px-4 py-3 flex flex-col gap-3">
@@ -94,9 +94,9 @@
     </div>
 
     <!-- 3 Sütunlu Ana SOC Paneli (%30 / %40 / %30) -->
-    <main class="soc-grid mx-auto w-full max-w-[1920px] flex-1 gap-3 p-4">
+    <main class="soc-grid mx-auto w-full max-w-[1920px] flex-1 min-h-0 gap-3 p-4">
       <!-- SOL SÜTUN (%30): Canlı İşlem & Alarm Akışı -->
-      <section class="soc-panel flex flex-col overflow-hidden">
+      <section class="soc-panel flex min-h-0 flex-col overflow-hidden">
         <div class="soc-panel-header">
           <div>
             <h2 class="text-sm font-semibold text-white">Canlı İşlem ve Alarm Akışı</h2>
@@ -116,7 +116,7 @@
       </section>
 
       <!-- ORTA SÜTUN (%40): Etkileşimli Dolandırıcılık Ağ Haritası (Cytoscape.js) -->
-      <section class="soc-panel flex flex-col overflow-hidden">
+      <section class="soc-panel flex min-h-0 flex-col overflow-hidden">
         <div class="soc-panel-header flex-wrap gap-2">
           <div class="min-w-0">
             <div class="flex items-center gap-2">
@@ -153,16 +153,16 @@
           </span>
         </div>
 
-        <div class="relative flex-1 min-h-[420px] bg-slate-950/80">
-          <div id="cy" class="h-full w-full"></div>
+        <div class="relative flex-1 min-h-[380px] bg-slate-950/80">
+          <div id="cy" class="absolute inset-0 h-full w-full"></div>
           <div id="graph-node-inspector" class="hidden absolute bottom-3 left-3 right-3 rounded-lg border border-slate-700/90 bg-slate-900/95 px-3 py-2 text-xs shadow-xl backdrop-blur"></div>
         </div>
       </section>
 
       <!-- SAĞ SÜTUN (%30): SHAP Gerekçeleri ve Otonom Ajan Raporu (HITL) -->
-      <section class="soc-panel flex flex-col overflow-hidden">
+      <section class="soc-panel flex min-h-0 flex-col overflow-hidden">
         <!-- Üst Yarı: SHAP Gerekçeleri -->
-        <div class="border-b border-slate-800/90 flex flex-col">
+        <div class="border-b border-slate-800/90 flex shrink-0 flex-col">
           <div class="soc-panel-header">
             <div>
               <h2 class="text-sm font-semibold text-white">SHAP Açıklanabilirlik (Top-3)</h2>
@@ -180,7 +180,7 @@
         </div>
 
         <!-- Alt Yarı: Otonom Ajan Raporu & Analist Kararları -->
-        <div class="flex flex-1 flex-col overflow-hidden">
+        <div class="flex flex-1 min-h-0 flex-col overflow-hidden">
           <div class="soc-panel-header">
             <div>
               <h2 class="text-sm font-semibold text-white">Otonom Ajan SAR Raporu</h2>
