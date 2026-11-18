@@ -13,6 +13,7 @@ okuyarak başlar. Mimari kararlar burada; ayrıntılı domain kuralları `.antig
 | `src/models/` | LightGBM eğitimi, temporal değerlendirme, SHAP açıklayıcı, Alert yazımı |
 | `src/api/` | FastAPI gerçek zamanlı skorlama ve SSE ile canlı işlem/alert akışı |
 | `src/agent/` | Otonom soruşturma ajanı (Alert → kanıt toplama → rapor) |
+| `src/dashboard/` | Sıfır Node.js gerektiren etkileşimli SOC Dashboard (`static/`) |
 
 ## Komutlar (Windows, proje kökünden)
 ```powershell
@@ -62,11 +63,14 @@ okuyarak başlar. Mimari kararlar burada; ayrıntılı domain kuralları `.antig
   durumunu belleğe yükler, tekil işlemleri `RLock` altında kronolojik olarak skorlar, `RiskThresholds`
   (`ALLOW` / `REVIEW` / `ALERT` / `BLOCK`) kararını üretir, işlemleri ve eşik üstü alarmları DB'ye yazar.
 - IBAN loglamasında `mask_iban` (`TR** **** **** **** **** **12 34`) zorunludur.
-- Uçlar (`src/api/routes.py` & `main.py`): `POST /transactions/score`, `GET /stream/events` (SSE),
+- Uçlar (`src/api/routes.py` & `main.py`): `GET /`, `GET /dashboard`, `/static/*`,
+  `POST /transactions/score`, `POST /simulator/run` (`BackgroundTasks`), `GET /stream/events` (SSE),
   `GET /alerts`, `GET/PATCH /alerts/{alert_id}`, `POST /alerts/{alert_id}/investigate`,
   `GET /alerts/{alert_id}/investigation`, `GET /graph/{account_id}`, `GET /health`.
 - `TrafficSimulator` (`src/api/simulator.py`): `np.random.default_rng(seed)` ile deterministik,
-  normal + `FRAUD_RING`/`ACCOUNT_TAKEOVER`/`CARD_TESTING` akışını asenkron olarak API'ye basar.
+  `ALL`/`NORMAL`/`FRAUD_RING`/`ACCOUNT_TAKEOVER`/`CARD_TESTING` akışını CLI veya API arka planı üzerinden basar.
+- SOC Dashboard (`src/dashboard/static/`): Koyu temada Tailwind CDN, Cytoscape.js ağ haritası
+  (`1-Hop`/`2-Hop`), `EventSource` canlı SSE akışı, SHAP çubukları ve Human-in-the-Loop analist kararları.
 
 ## Otonom soruşturma ajanı mimarisi
 - `InvestigationToolkit` (`src/agent/tools.py`): salt-okunur ve deterministik kanıt araçları

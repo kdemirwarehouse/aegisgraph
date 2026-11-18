@@ -9,10 +9,17 @@ Klasik kural motorları ve tekil işlem modelleri, koordineli dolandırıcılı�
 
 Yüksek riskli işlemler **Alert** üretir. Otonom bir soruşturma ajanı kanıt toplayıp analiste açıklanabilir bir rapor sunar.
 
-```text
-İşlem akışı ──► Feature store ──► LightGBM ─┐
-      │                                     ├──► Risk skoru ──► Alert ──► Soruşturma ajanı ──► Analist
-      └──────► Graf (NetworkX) ──► Graf ────┘                       (SSE)                     (Dashboard)
+```mermaid
+flowchart LR
+    A["Sanal Banka ve Canli Trafik Simulatoru<br/>src/generator • POST /simulator/run"] --> B["Point-in-Time Ozellik Motoru<br/>Tabular Velocity + NetworkX Graf"]
+    B --> C["Hibrit LightGBM ve SHAP<br/>Risk Skoru • Graf Payi • Top-3 Gerekce"]
+    C --> D["FastAPI + SQLite + SSE Akisi<br/>ScoringService • GET /stream/events"]
+    D -->|"risk >= 0.70"| E["Alert Kaydi ve Canli Yayin<br/>alerts tablosu • SSE alert"]
+    E -->|"risk >= 0.85"| F["Otonom SAR Sorusturma Ajani<br/>Salt-okunur Araclar • MASAK Ozeti"]
+    D --> G["SOC Dashboard<br/>Tailwind + Cytoscape.js + EventSource"]
+    E --> G
+    F --> G
+    G -->|"Human-in-the-Loop Onayi"| H["Analist Nihai Karari<br/>PATCH /alerts/{id}"]
 ```
 
 ## Kurulum
@@ -70,15 +77,25 @@ TX-00067511  MONEY_MULE  risk=0.962  graf payı=%43
 pytest
 ```
 
-## Gerçek zamanlı API ve canlı trafik simülatörü
+## SOC Dashboard ve gerçek zamanlı API
+
+Sıfır Node.js kurulumu gerektirmeyen etkileşimli SOC Dashboard doğrudan FastAPI tarafından servis edilir:
 
 ```bash
-python -m src.api.main                          # FastAPI + SSE sunucusu (http://127.0.0.1:8000)
-python -m src.api.simulator --count 30 --tps 5  # normal + fraud senaryolarını canlı akışa basar
+python -m src.api.main                          # FastAPI + SSE + Dashboard (http://127.0.0.1:8000)
+python -m src.api.simulator --count 30 --tps 5  # CLI üzerinden canlı trafik basar
 ```
 
+Tarayıcıda `http://127.0.0.1:8000/` (veya `/dashboard`) adresini açtığınızda:
+- **Üst Bar (KPI & Demo Kontrolü):** `● SSE Live` bağlantı göstergesi, toplam işlem, açık alarm, riskli tutar (`₺`), ortalama gecikme kartları ve `POST /simulator/run` ucunu çağıran tek tık demo butonları (`Normal Akış`, `Fraud Ring`, `Account Takeover`, `Card Testing`).
+- **Sol Sütun (%30):** SSE (`GET /stream/events`) üzerinden akan maskeli IBAN'lı işlemler, karar rozetleri (`ALLOW` / `REVIEW` / `ALERT` / `BLOCK`) ve `ml_score` vs `graph_score` katkı çubuğu.
+- **Orta Sütun (%40):** Cytoscape.js ile `GET /graph/{account_id}` komşuluk haritası (hedef hesap, ilişkili hesaplar, ortak cihazlar, `/24` IP alt ağları) ve `1-Hop / 2-Hop` geçiş kontrolü.
+- **Sağ Sütun (%30):** Türkçe SHAP top-3 etki çubukları, otonom ajan SAR raporu (`POST /alerts/{alert_id}/investigate`) ve Human-in-the-Loop analist karar butonları (`PATCH /alerts/{alert_id}`).
+
 API uçları:
+- `GET /`, `GET /dashboard` — Etkileşimli SOC Dashboard arayüzünü servis eder (`/static/*` statik dosyalarıyla)
 - `POST /transactions/score` — Tekil işlemi milisaniyeler içinde skorlar, graf payı ve SHAP top-3 gerekçeleri döner
+- `POST /simulator/run` — Seçilen senaryo (`ALL`, `NORMAL`, `FRAUD_RING`, `ACCOUNT_TAKEOVER`, `CARD_TESTING`) için arka planda canlı trafik başlatır
 - `GET /stream/events` — Yeni işlemleri (`transaction`), alarmları (`alert`) ve otonom soruşturmaları (`investigation`, `investigation_failed`) Server-Sent Events (SSE) ile canlı yayınlar
 - `GET /alerts`, `GET/PATCH /alerts/{alert_id}` — Alarmları filtreler, görüntüler ve durum günceller
 - `POST /alerts/{alert_id}/investigate` — İlgili alarm için otonom soruşturmayı başlatır ve SAR raporunu kaydeder
@@ -142,10 +159,11 @@ aegisgraph/
 │   ├── generator/             # Sentetik veri motoru
 │   ├── features/              # Tabular + graf özellikleri, FeatureExtractor
 │   ├── models/                # Train, explainer (SHAP), scorer (alert)
-│   ├── api/                   # Gerçek zamanlı skorlama API ve SSE akışı
-│   └── agent/                 # Otonom soruşturma ajanı
+│   ├── api/                   # Gerçek zamanlı skorlama API, SSE akışı ve simülatör tetikleyicisi
+│   ├── agent/                 # Otonom soruşturma ajanı ve SAR raporlayıcı
+│   └── dashboard/             # Sıfır Node.js SOC Dashboard arayüzü (index.html, styles.css, app.js)
 ├── artifacts/                 # report.md, metrics.json (model ikilileri git dışı)
-└── tests/                     # test_generator.py, test_features_and_model.py, test_api.py, test_agent.py
+└── tests/                     # test_generator.py, test_features_and_model.py, test_api.py, test_agent.py, test_dashboard.py
 ```
 
 Tüm veriler sentetiktir; gerçek kişi veya hesap bilgisi içermez.
