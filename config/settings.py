@@ -161,10 +161,14 @@ class AgentSettings(BaseModel):
     micro_tx_amount_try: float = Field(25.0, gt=0, description="Mikro işlem (kart deneme) üst tutarı (TRY)")
     micro_burst_window_seconds: int = Field(3_600, ge=60, description="Mikro işlem patlaması penceresi (sn)")
     card_testing_min_burst: int = Field(3, ge=2, description="Kart deneme sinyali için min. mikro işlem sayısı")
+    card_testing_strong_burst: int = Field(8, ge=2, description="Güçlü kart deneme sinyali için mikro işlem sayısı")
     amount_deviation_ratio: float = Field(5.0, gt=1, description="Baz medyana göre şüpheli tutar sapma katı")
 
     # Ağ kanıt eşikleri (katır / halka)
     mule_min_fan_in: int = Field(4, ge=2, description="Katır hub sinyali için 24 saatlik min. farklı gönderici")
+    mule_passthrough_min_ratio: float = Field(0.65, gt=0, description="Katır geçiş (fan-out/fan-in) oranı alt sınırı")
+    mule_passthrough_max_ratio: float = Field(1.10, gt=0, description="Katır geçiş (fan-out/fan-in) oranı üst sınırı")
+    mule_hub_in_out_ratio: float = Field(3.0, gt=1, description="Hub hesap için giriş/çıkış derece oranı eşiği")
     ring_min_shared_accounts: int = Field(2, ge=1, description="Halka sinyali için ortak cihaz/IP min. hesap sayısı")
 
     # Tipoloji ve aksiyon karar eşikleri (öneri — insan onayı daima zorunlu)
@@ -185,6 +189,10 @@ class AgentSettings(BaseModel):
 
     @model_validator(mode="after")
     def _check_provider(self) -> AgentSettings:
+        if self.mule_passthrough_min_ratio >= self.mule_passthrough_max_ratio:
+            raise ValueError("agent.mule_passthrough_min_ratio, mule_passthrough_max_ratio değerinden küçük olmalı")
+        if self.card_testing_strong_burst < self.card_testing_min_burst:
+            raise ValueError("agent.card_testing_strong_burst, card_testing_min_burst değerinden küçük olamaz")
         if self.provider != "local" and (self.api_key is None or not self.api_key.get_secret_value()):
             raise ValueError("LLM sağlayıcı modu için agent.api_key zorunludur (veya provider='local' kullanın)")
         return self

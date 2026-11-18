@@ -25,6 +25,7 @@ from src.database.models import (
     Investigation,
     RecommendedAction,
     SuspectedTypology,
+    redact_ibans,
 )
 from src.features.pipeline import FeatureExtractor
 
@@ -99,6 +100,7 @@ class FraudInvestigatorAgent:
                 "tool": tool_name,
                 "arguments": args,
                 "status": "ok",
+                "result_keys": sorted(result)[: self.settings.agent.max_evidence_ids],
             })
 
         # Adım 1: Alarm ve tetikleyen işlem kanıtları
@@ -276,6 +278,8 @@ class FraudInvestigatorAgent:
         receiver_network: dict[str, Any],
     ) -> tuple[SuspectedTypology, float, list[str], list[str], RecommendedAction]:
         tx = evidence["transaction"]
+        cfg = self.settings.agent
+        min_shared = cfg.ring_min_shared_accounts
         risk_score = float(evidence["risk_score"])
         graph_score = float(evidence["graph_score"])
         shap_features = {str(r.get("feature")) for r in evidence.get("reasons", [])}
@@ -300,9 +304,9 @@ class FraudInvestigatorAgent:
             scores[SuspectedTypology.FRAUD_RING] += 0.45
         elif reciprocal:
             scores[SuspectedTypology.FRAUD_RING] += 0.20
-        if len(s_shared_dev) >= 2 or len(r_shared_dev) >= 2:
+        if len(s_shared_dev) >= min_shared or len(r_shared_dev) >= min_shared:
             scores[SuspectedTypology.FRAUD_RING] += 0.25
-        if len(s_shared_ip) >= 2 or len(r_shared_ip) >= 2:
+        if len(s_shared_ip) >= min_shared or len(r_shared_ip) >= min_shared:
             scores[SuspectedTypology.FRAUD_RING] += 0.15
         if sender_profile.get("kyc_level", 3) <= 2 and receiver_profile.get("kyc_level", 3) <= 2:
             scores[SuspectedTypology.FRAUD_RING] += 0.10
@@ -322,11 +326,16 @@ class FraudInvestigatorAgent:
         s_fan_in = int(sender_network.get("fan_in_24h_unique_senders", 0))
         s_out_ratio = float(sender_network.get("fan_out_to_fan_in_ratio", 0.0))
 
-        if r_fan_in >= 8 or r_in_deg >= 10:
+        mule_fan_in = cfg.mule_min_fan_in
+        if r_fan_in >= 2 * mule_fan_in or r_in_deg >= 2 * mule_fan_in + 2:
             scores[SuspectedTypology.MONEY_MULE] += 0.50
-        elif r_fan_in >= 4 or r_in_deg >= 6 or s_fan_in >= 5:
+        elif r_fan_in >= mule_fan_in or r_in_deg >= mule_fan_in + 2 or s_fan_in >= mule_fan_in + 1:
             scores[SuspectedTypology.MONEY_MULE] += 0.38
-        if (0.65 <= r_out_ratio <= 1.10 and r_fan_in >= 3) or (0.65 <= s_out_ratio <= 1.10 and s_fan_in >= 3):
+        pt_lo, pt_hi = cfg.mule_passthrough_min_ratio, cfg.mule_passthrough_max_ratio
+        hub_min = mule_fan_in - 1
+        if (pt_lo <= r_out_ratio <= pt_hi and r_fan_in >= hub_min) or (
+            pt_lo <= s_out_ratio <= pt_hi and s_fan_in >= hub_min
+        ):
             scores[SuspectedTypology.MONEY_MULE] += 0.28
         if shap_features & {
             "receiver_unique_senders_24h",
@@ -336,15 +345,16 @@ class FraudInvestigatorAgent:
             "sender_in_out_ratio",
         }:
             scores[SuspectedTypology.MONEY_MULE] += 0.12
-        if float(receiver_network.get("in_out_ratio", 1.0)) >= 3.0 and receiver_profile.get("segment") != "MERCHANT":
+        r_in_out = float(receiver_network.get("in_out_ratio", 1.0))
+        if r_in_out >= cfg.mule_hub_in_out_ratio and receiver_profile.get("segment") != "MERCHANT":
             scores[SuspectedTypology.MONEY_MULE] += 0.10
 
         # 3) CARD_TESTING sinyalleri
         micro_burst = int(sender_recent.get("micro_tx_burst_count", 0))
         is_ecom = tx.get("channel") == "ECOMMERCE" or receiver_profile.get("segment") == "MERCHANT"
-        if micro_burst >= 8:
+        if micro_burst >= cfg.card_testing_strong_burst:
             scores[SuspectedTypology.CARD_TESTING] += 0.55
-        elif micro_burst >= 3:
+        elif micro_burst >= cfg.card_testing_min_burst:
             scores[SuspectedTypology.CARD_TESTING] += 0.40
         if is_ecom:
             scores[SuspectedTypology.CARD_TESTING] += 0.20
@@ -366,7 +376,7 @@ class FraudInvestigatorAgent:
         ato_shap = {"is_new_device_for_account", "device_is_emulator", "is_foreign_or_new_ip"}
         if is_unusual_device or (shap_features & ato_shap):
             scores[SuspectedTypology.ACCOUNT_TAKEOVER] += 0.30
-        if max_dev_ratio >= 5.0 or tx_amount >= self.settings.risk.high_value_amount_try:
+        if max_dev_ratio >= cfg.amount_deviation_ratio or tx_amount >= self.settings.risk.high_value_amount_try:
             scores[SuspectedTypology.ACCOUNT_TAKEOVER] += 0.25
         if is_night:
             scores[SuspectedTypology.ACCOUNT_TAKEOVER] += 0.10
@@ -374,7 +384,7 @@ class FraudInvestigatorAgent:
             scores[SuspectedTypology.ACCOUNT_TAKEOVER] += 0.10
 
         best_typology, best_signal = max(scores.items(), key=lambda kv: kv[1])
-        typology = SuspectedTypology.ANOMALOUS_ACTIVITY if best_signal < 0.35 else best_typology
+        typology = SuspectedTypology.ANOMALOUS_ACTIVITY if best_signal < cfg.min_typology_signal else best_typology
 
         confidence = round(min(0.99, max(risk_score * 0.65 + min(best_signal, 1.0) * 0.35, risk_score * 0.85)), 4)
 
@@ -413,7 +423,7 @@ class FraudInvestigatorAgent:
                 f"yaş {receiver_profile['account_age_days']:.0f} gün)."
             )
 
-        if max_dev_ratio >= 3.0 or micro_burst >= 3 or is_foreign:
+        if max_dev_ratio >= cfg.amount_deviation_ratio or micro_burst >= cfg.card_testing_min_burst or is_foreign:
             recent_ids = [t["transaction_id"] for t in sender_recent.get("transactions", [])[:5]]
             evidence_chain.append(
                 f"[DAVRANIŞ] Baz medyana göre maks. tutar sapması {max_dev_ratio:.1f}x, "
@@ -456,7 +466,7 @@ class FraudInvestigatorAgent:
                 f"hesaplar={all_shared_ips[:10]}."
             )
 
-        if r_fan_in >= 3 or s_fan_in >= 3:
+        if r_fan_in >= hub_min or s_fan_in >= hub_min:
             hub_id = receiver_profile.get("account_id") if r_fan_in >= s_fan_in else sender_profile.get("account_id")
             hub_net = receiver_network if r_fan_in >= s_fan_in else sender_network
             evidence_chain.append(
@@ -472,7 +482,7 @@ class FraudInvestigatorAgent:
         thresholds = self.settings.risk
         if risk_score >= thresholds.block_score and (
             typology in {SuspectedTypology.FRAUD_RING, SuspectedTypology.ACCOUNT_TAKEOVER, SuspectedTypology.MONEY_MULE}
-            or confidence >= 0.85
+            or confidence >= cfg.block_min_confidence
         ):
             action = RecommendedAction.BLOCK_ACCOUNT
         elif risk_score >= thresholds.alert_score:
@@ -482,7 +492,7 @@ class FraudInvestigatorAgent:
         else:
             action = RecommendedAction.FALSE_POSITIVE_DISMISS
 
-        return typology, confidence, related_accounts, evidence_chain, action
+        return typology, confidence, related_accounts, redact_ibans(evidence_chain), action
 
     def _build_executive_summary_tr(
         self,
@@ -505,7 +515,7 @@ class FraudInvestigatorAgent:
 
         risk_val = float(evidence["risk_score"])
         graph_pct = float(evidence["graph_score"]) * 100
-        return (
+        summary = (
             f"MASAK Şüpheli İşlem Bildirimi (SAR) Ön Soruşturma Özeti — "
             f"Alarm #{evidence['alert_id']} / İşlem {evidence['transaction_id']}: "
             f"{tx['timestamp']} tarihinde gönderici {tx['sender_account_id']} ({s_iban}) tarafından "
@@ -518,7 +528,8 @@ class FraudInvestigatorAgent:
             f"Önerilen aksiyon: {action_desc} ({action.value}). "
             f"Not: Bu rapor karar destek önerisidir; "
             f"kesin bloke / CONFIRMED_FRAUD kararı insan analist onayı gerektirir."
-        )[:4000]
+        )
+        return redact_ibans(summary)[:4000]
 
     def _maybe_enrich_with_llm(
         self,
@@ -542,18 +553,24 @@ class FraudInvestigatorAgent:
         )
         try:
             resp = httpx.post(
-                "https://api.openai.com/v1/chat/completions",
+                f"{self.settings.agent.llm_base_url.rstrip('/')}/chat/completions",
                 headers={"Authorization": f"Bearer {self.settings.agent.api_key.get_secret_value()}"},
                 json={
                     "model": self.settings.agent.model_name,
                     "temperature": self.settings.agent.temperature,
                     "messages": [{"role": "user", "content": prompt}],
                 },
-                timeout=10.0,
+                timeout=self.settings.agent.llm_timeout_seconds,
             )
             resp.raise_for_status()
             text = str(resp.json()["choices"][0]["message"]["content"]).strip()
-            return text[:4000] if text else base_summary
+            if not text:
+                return base_summary
+            # Derinlemesine savunma: LLM ham IBAN üretse bile maskelenir, HITL notu korunur
+            text = redact_ibans(text)
+            if "insan analist onayı" not in text:
+                text = f"{text} Not: Kesin karar insan analist onayı gerektirir."
+            return text[:4000]
         except Exception as exc:
             logger.warning("Harici LLM çağrısı başarısız; yerel SAR özetine dönüldü: %s", exc)
             return base_summary

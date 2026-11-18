@@ -367,6 +367,58 @@ def test_agent_investigates_all_fraud_scenarios_and_produces_sar(
         assert alert_row.status is not AlertStatus.CONFIRMED_FRAUD
 
 
+def test_llm_provider_output_is_redacted_and_falls_back_on_error(
+    agent_env: AgentTestEnv, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """LLM modu: sağlayıcı ham IBAN döndürse bile maskelenir; hata durumunda yerel SAR özeti korunur."""
+    import httpx
+
+    from src.agent import investigator as inv_mod
+
+    llm_settings = agent_env.settings.model_copy(
+        update={
+            "agent": AgentSettings(
+                provider="openai",
+                api_key="test-key",
+                llm_base_url="https://llm.invalid/v1/",
+                llm_timeout_seconds=3.0,
+            )
+        }
+    )
+    agent = FraudInvestigatorAgent(engine=agent_env.engine, extractor=agent_env.extractor, settings=llm_settings)
+    alert_id = agent_env.scenario_alerts[FraudScenario.ACCOUNT_TAKEOVER.value]
+    calls: list[dict[str, Any]] = []
+
+    def fake_post(url: str, **kwargs: Any) -> httpx.Response:
+        calls.append({"url": url, **kwargs})
+        body = {"choices": [{"message": {"content": "SAR özeti: alıcı TR330006100519786457841326 hesabı."}}]}
+        return httpx.Response(200, json=body, request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(inv_mod.httpx, "post", fake_post)
+    report = agent.investigate(alert_id, persist=False)
+    assert calls and calls[0]["url"] == "https://llm.invalid/v1/chat/completions"
+    assert calls[0]["timeout"] == 3.0
+    assert not RAW_IBAN_RE.search(report.executive_summary_tr)
+    assert "**13 26" in report.executive_summary_tr
+    assert "insan analist onayı" in report.executive_summary_tr
+    assert report.requires_human_approval is True
+
+    def failing_post(url: str, **kwargs: Any) -> httpx.Response:
+        raise httpx.ConnectError("bağlantı yok")
+
+    monkeypatch.setattr(inv_mod.httpx, "post", failing_post)
+    fallback = agent.investigate(alert_id, persist=False)
+    assert fallback.executive_summary_tr.startswith("MASAK Şüpheli İşlem Bildirimi")
+
+
+def test_agent_settings_cross_field_validation() -> None:
+    """Çelişkili ajan eşikleri reddedilir."""
+    with pytest.raises(ValidationError):
+        AgentSettings(mule_passthrough_min_ratio=1.2, mule_passthrough_max_ratio=1.0)
+    with pytest.raises(ValidationError):
+        AgentSettings(card_testing_min_burst=5, card_testing_strong_burst=4)
+
+
 def test_investigation_api_endpoints_and_auto_sse_trigger(agent_env: AgentTestEnv) -> None:
     """API soruşturma uçlarını ve kritik alarmlarda otomatik SSE `investigation` yayınını doğrular."""
     target_alert_id = agent_env.scenario_alerts[FraudScenario.FRAUD_RING.value]
