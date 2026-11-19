@@ -1,8 +1,6 @@
-import asyncio
-import time
 from pathlib import Path
 import gradio as gr
-from fastapi.staticfiles import StaticFiles
+import uvicorn
 from config.settings import get_settings
 from src.api.main import app as fastapi_app
 
@@ -30,11 +28,7 @@ ensure_runtime_artifacts()
 with gr.Blocks(title='AegisGraph SOC') as demo:
     gr.HTML('<div style=margin:-16px><iframe src=/dashboard style=width:100%;height:95vh;border:none></iframe></div>')
 
+app = gr.mount_gradio_app(fastapi_app, demo, path='/')
+
 if __name__ == '__main__':
-    demo.launch(server_name='0.0.0.0', server_port=7860, ssr_mode=False, prevent_thread_lock=True)
-    demo.app.mount('/static', StaticFiles(directory='src/dashboard/static'), name='static')
-    demo.app.include_router(fastapi_app.router)
-    asyncio.run(fastapi_app.router.startup())
-    demo.app.state.__dict__.update(fastapi_app.state.__dict__)
-    while True:
-        time.sleep(3600)
+    uvicorn.run(app, host='0.0.0.0', port=7860)
