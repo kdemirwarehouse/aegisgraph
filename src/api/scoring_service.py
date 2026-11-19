@@ -1,5 +1,7 @@
 """AegisGraph canlı skorlama, alert yönetimi ve graf komşuluk servisi.
 
+
+UTC = timezone.utc
 Eğitilmiş LightGBM modelini, durumlu `FeatureExtractor` örneğini ve SHAP
 açıklayıcıyı bellekte tutarak tekil işlemleri milisaniyeler içinde skorlar,
 eşik üzerindeki işlemleri `alerts` tablosuna kaydeder ve SSE abonelerine yayınlar.
@@ -15,7 +17,9 @@ import time
 from collections import deque
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+UTC = timezone.utc
 try:
     from enum import StrEnum
 except ImportError:

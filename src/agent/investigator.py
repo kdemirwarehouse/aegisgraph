@@ -1,5 +1,7 @@
 """Otonom finansal soruşturma ajanı ve MASAK/SAR rapor sentezleyicisi.
 
+
+UTC = timezone.utc
 Ajan yalnızca salt-okunur kanıt araçlarını çağırarak delil zinciri toplar,
 şüpheli tipolojiyi sınıflandırır, Türkçe MASAK/SAR formatında özet üretir ve
 **Human-in-the-Loop** ilkesi gereği daima insan analist onayı bekleyen bir
@@ -9,7 +11,9 @@ aksiyon önerisi sunar (asla otomatik `CONFIRMED_FRAUD` kararı vermez).
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+UTC = timezone.utc
 from typing import Any
 
 import httpx

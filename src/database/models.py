@@ -15,6 +15,7 @@ from __future__ import annotations
 import re
 from datetime import datetime
 from decimal import Decimal
+
 try:
     from enum import StrEnum
 except ImportError:
