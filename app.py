@@ -5,6 +5,14 @@ import gradio as gr
 from config.settings import get_settings
 from src.api.main import app as fastapi_app
 
+try:
+    import spaces
+    @spaces.GPU
+    def _zerogpu_keepalive():
+        return None
+except ImportError:
+    pass
+
 def ensure_runtime_artifacts():
     settings = get_settings()
     db_path = Path(settings.database.path)
@@ -19,7 +27,7 @@ def ensure_runtime_artifacts():
 ensure_runtime_artifacts()
 
 with gr.Blocks(title='AegisGraph SOC') as demo:
-    gr.HTML('<div style="margin:-16px;"><iframe src="/soc/dashboard" style="width:100%; height:95vh; border:none;"></iframe></div>')
+    gr.HTML('<div style=margin:-16px><iframe src=/soc/dashboard style=width:100%;height:95vh;border:none></iframe></div>')
 
 if __name__ == '__main__':
     demo.launch(server_name='0.0.0.0', server_port=7860, ssr_mode=False, prevent_thread_lock=True)
