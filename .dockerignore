@@ -1,0 +1,34 @@
+# Sanal ortam ve Python önbellekleri
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Versiyon kontrolü, ortam ve IDE dosyaları
+.git/
+.gitignore
+.vscode/
+.idea/
+.antigravity/
+.env
+.env.*
+
+# Testler, dokümanlar ve görseller (README.md hariç)
+docs/
+tests/
+*.md
+!README.md
+
+# Yerel veri ve model çıktıları (Docker build sırasında temiz üretilir)
+data/
+artifacts/
+*.db
+*.db-wal
+*.db-shm
+*.pkl
+*.joblib
