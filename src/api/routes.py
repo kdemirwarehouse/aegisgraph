@@ -341,7 +341,7 @@ async def stream_events(
 
                 try:
                     evt = await asyncio.wait_for(queue.get(), timeout=wait_for)
-                except TimeoutError:
+                except (TimeoutError, asyncio.TimeoutError):
                     if deadline is not None and time.monotonic() >= deadline:
                         break
                     yield ": heartbeat\n\n"
