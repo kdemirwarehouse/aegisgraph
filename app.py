@@ -1,4 +1,4 @@
-import os
+import time
 from pathlib import Path
 import gradio as gr
 from fastapi.staticfiles import StaticFiles
@@ -25,4 +25,5 @@ if __name__ == '__main__':
     demo.launch(server_name='0.0.0.0', server_port=7860, prevent_thread_lock=True)
     demo.app.mount('/static', StaticFiles(directory='src/dashboard/static'), name='soc_static')
     demo.app.include_router(fastapi_app.router)
-    demo.block_thread()
+    while True:
+        time.sleep(3600)
