@@ -1,3 +1,13 @@
+---
+title: AegisGraph
+emoji: 🛡️
+colorFrom: red
+colorTo: slate
+sdk: gradio
+app_file: app.py
+pinned: false
+---
+
 # 🛡️ AegisGraph
 
 Hibrit (ML + Graf Analizi) ve otonom gerçek zamanlı dolandırıcılık tespit sistemi.
