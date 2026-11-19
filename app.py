@@ -1,7 +1,7 @@
+import asyncio
 import time
 from pathlib import Path
 import gradio as gr
-from fastapi.staticfiles import StaticFiles
 from config.settings import get_settings
 from src.api.main import app as fastapi_app
 
@@ -19,11 +19,11 @@ def ensure_runtime_artifacts():
 ensure_runtime_artifacts()
 
 with gr.Blocks(title='AegisGraph SOC') as demo:
-    gr.HTML('<div style="margin:-16px;"><iframe src="/dashboard" style="width:100%; height:95vh; border:none;"></iframe></div>')
+    gr.HTML('<div style="margin:-16px;"><iframe src="/soc/dashboard" style="width:100%; height:95vh; border:none;"></iframe></div>')
 
 if __name__ == '__main__':
-    demo.launch(server_name='0.0.0.0', server_port=7860, prevent_thread_lock=True)
-    demo.app.mount('/static', StaticFiles(directory='src/dashboard/static'), name='soc_static')
-    demo.app.include_router(fastapi_app.router)
+    demo.launch(server_name='0.0.0.0', server_port=7860, ssr_mode=False, prevent_thread_lock=True)
+    demo.app.mount('/soc', fastapi_app)
+    asyncio.run(fastapi_app.router.startup())
     while True:
         time.sleep(3600)
