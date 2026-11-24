@@ -2,7 +2,8 @@
 name = "aegisgraph"
 version = "0.1.0"
 description = "Hybrid ML + Graph real-time fraud detection with an autonomous investigation agent"
-requires-python = ">=3.11"
+requires-python = ">=3.10"  # HF Spaces runtime 3.10; geliştirme 3.11+
+license = { text = "MIT" }
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

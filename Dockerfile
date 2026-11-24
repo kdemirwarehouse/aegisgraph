@@ -17,6 +17,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY pyproject.toml README.md ./
 COPY config/ ./config/
 COPY src/ ./src/
+COPY app.py ./
 
 # Veri ve artefakt dizinlerini oluştur; sentetik veriyi üret ve modeli build aşamasında eğit
 RUN mkdir -p /app/data /app/artifacts \
@@ -26,4 +27,5 @@ RUN mkdir -p /app/data /app/artifacts \
 
 EXPOSE 7860
 
-CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "7860"]
+# HF Spaces ile aynı giriş noktası: FastAPI (API + SSE + Dashboard) + Gradio, port 7860
+CMD ["python", "app.py"]

@@ -17,5 +17,6 @@ uvicorn[standard]>=0.30
 sse-starlette>=2.1
 httpx>=0.27
 
-pytest>=8.2
-ruff>=0.5
+# Hugging Face Spaces arayüzü (README sdk_version ile aynı tutulmalı)
+gradio==5.23.1
+requests>=2.31            # gradio 5.23 bunu import eder ama bağımlılık olarak bildirmez
