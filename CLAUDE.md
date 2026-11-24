@@ -17,12 +17,12 @@ okuyarak başlar. Mimari kararlar burada; ayrıntılı domain kuralları `.antig
 
 ## Komutlar (Windows, proje kökünden)
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt   # runtime + pytest/ruff
 .\.venv\Scripts\python.exe -m src.generator.synthetic_data          # CSV + SQLite üret
 .\.venv\Scripts\python.exe -m src.models.train                    # özellik + eğitim + artifacts/ + alerts
 .\.venv\Scripts\python.exe -m src.api.main                        # FastAPI + SSE sunucusu
 .\.venv\Scripts\python.exe -m src.api.simulator --count 30        # canlı trafik simülatörü
-.\.venv\Scripts\python.exe -m pytest                                # tüm testler (~60 sn)
+.\.venv\Scripts\python.exe -m pytest                                # tüm testler (~2 dk)
 .\.venv\Scripts\python.exe -m ruff check .
 ```
 
@@ -62,6 +62,8 @@ okuyarak başlar. Mimari kararlar burada; ayrıntılı domain kuralları `.antig
 - `ScoringService` (`src/api/scoring_service.py`): `artifacts/model.txt` ve sıcak `feature_extractor.joblib`
   durumunu belleğe yükler, tekil işlemleri `RLock` altında kronolojik olarak skorlar, `RiskThresholds`
   (`ALLOW` / `REVIEW` / `ALERT` / `BLOCK`) kararını üretir, işlemleri ve eşik üstü alarmları DB'ye yazar.
+- `settings.api.write_api_key` (`AEGIS_API__WRITE_API_KEY`) tanımlıysa yazma uçları `require_write_key` ile `X-API-Key`
+  ister; boşsa demo modu. Yeni yazma ucu = `dependencies=WriteGuard`.
 - IBAN loglamasında `mask_iban` (`TR** **** **** **** **** **12 34`) zorunludur.
 - Uçlar (`src/api/routes.py` & `main.py`): `GET /`, `GET /dashboard`, `/static/*`,
   `POST /transactions/score`, `POST /simulator/run` (`BackgroundTasks`), `GET /stream/events` (SSE),
@@ -105,7 +107,9 @@ Fraud oranı varsayılan ayarlarla ~%1.0 (gerçekçi dengesizlik). Halka üyeler
 normal alışveriş de yapar.
 
 ## Kod standartları
-- Python ≥ 3.11, tam tip ipucu, `from __future__ import annotations`.
+- Python ≥ 3.10 uyumlu (HF Spaces runtime 3.10), tam tip ipucu, `from __future__ import annotations`.
+  `UTC` ve `StrEnum` yalnızca `src.compat` üzerinden içe aktarılır (`datetime.UTC` / `enum.StrEnum` doğrudan kullanılmaz).
+  CI (`.github/workflows/ci.yml`) ruff + pytest'i 3.10 ve 3.11'de çalıştırır; `gradio` sürümü README `sdk_version` ile aynı tutulur.
 - Her yeni modül için `tests/` altında pytest; yeni fraud senaryosu = topolojisini doğrulayan test.
 - Docstring ve log mesajları Türkçe, tanımlayıcılar İngilizce.
 - `print` yalnızca CLI özetinde; diğer her yerde `logging`.

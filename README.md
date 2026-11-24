@@ -18,7 +18,8 @@ Hibrit (ML + Graf Analizi) ve otonom gerçek zamanlı dolandırıcılık tespit 
 ![Python](https://img.shields.io/badge/python-3.11-blue)
 ![LightGBM](https://img.shields.io/badge/model-LightGBM%20%2B%20SHAP-green)
 ![FastAPI](https://img.shields.io/badge/API-FastAPI%20%2B%20SSE-009688)
-![Tests](https://img.shields.io/badge/tests-86%20passed-brightgreen)
+[![CI](https://github.com/kdemirwarehouse/aegisgraph/actions/workflows/ci.yml/badge.svg)](https://github.com/kdemirwarehouse/aegisgraph/actions/workflows/ci.yml)
+![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
 > 🚀 **Canlı demo:** [huggingface.co/spaces/kdemirwarehouse/aegisgraph](https://huggingface.co/spaces/kdemirwarehouse/aegisgraph) — kurulum gerektirmeden SOC Dashboard'u açıp simülatör butonlarıyla canlı fraud trafiği başlatabilirsiniz.
 
@@ -47,13 +48,13 @@ flowchart LR
 
 ## Kurulum
 
-Gereksinim: **Python ≥ 3.11**
+Gereksinim: **Python ≥ 3.10** (geliştirme 3.11+, Hugging Face Spaces 3.10)
 
 ```bash
 cd aegisgraph
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1          # Linux/macOS: source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt     # çalışma zamanı + pytest/ruff (sadece çalıştırmak için: requirements.txt)
 copy .env.example .env                 # isteğe bağlı
 ```
 
@@ -97,9 +98,11 @@ TX-00067511  MONEY_MULE  risk=0.962  graf payı=%43
 ## Testler
 
 ```bash
-pytest          # 86 test: generator, özellik/model, API, ajan, dashboard
+pytest          # 87 test: generator, özellik/model, API, ajan, dashboard
 ruff check .
 ```
+
+GitHub Actions (`.github/workflows/ci.yml`) her push ve PR'da `ruff` ve testleri Python 3.10 ve 3.11'de çalıştırır.
 
 ## SOC Dashboard ve gerçek zamanlı API
 
@@ -133,7 +136,15 @@ docker build -t aegisgraph .            # build sırasında sentetik veri üreti
 docker run -p 7860:7860 aegisgraph      # http://localhost:7860
 ```
 
-Hugging Face Spaces sürümü `app.py` üzerinden çalışır: eksikse veri ve modeli ilk açılışta üretir, FastAPI uygulamasını (API + SSE + Dashboard) Gradio ile aynı sunucuya bağlar ve `7860` portundan yayınlar.
+Docker imajı ve Hugging Face Spaces aynı giriş noktasını (`app.py`) kullanır: eksikse veri ve modeli ilk açılışta üretir, FastAPI uygulamasını (API + SSE + Dashboard) Gradio ile aynı sunucuya bağlar ve `7860` portundan yayınlar.
+
+### Yazma uçları için API anahtarı (opsiyonel)
+
+Varsayılan demo modunda uçlar açıktır. `AEGIS_API__WRITE_API_KEY` tanımlanırsa yazma uçları (`POST /transactions/score`, `PATCH /alerts/{id}`, `POST /alerts/{id}/investigate`, `POST /simulator/run`) `X-API-Key` başlığı ister, yoksa `401` döner. Okuma uçları ve SSE akışı açık kalır. Dashboard `401` aldığında anahtarı bir kez sorar ve oturum boyunca (`sessionStorage`) hatırlar. `GET /health` yanıtındaki `write_auth_required` alanı anahtarın aktif olup olmadığını gösterir.
+
+```bash
+curl -X PATCH http://127.0.0.1:8000/alerts/12 -H "X-API-Key: $AEGIS_API__WRITE_API_KEY"      -H "Content-Type: application/json" -d '{"status": "INVESTIGATING"}'
+```
 
 ## Otonom soruşturma ajanı
 
@@ -186,6 +197,7 @@ aegisgraph/
 ├── .antigravity/rules.md      # Domain + kod kuralları (ajanlar için bağlayıcı)
 ├── CLAUDE.md                  # Mimari ve teknik kurallar
 ├── config/settings.py         # Merkezi konfigürasyon
+├── .github/workflows/ci.yml   # GitHub Actions: ruff + pytest (3.10 / 3.11)
 ├── data/raw/                  # Üretilen veri (git'e girmez)
 ├── src/
 │   ├── database/              # ORM + Pydantic şemalar, engine, toplu yükleme
@@ -206,9 +218,9 @@ aegisgraph/
 - **Sentetik veri:** Metrikler (PR-AUC ≈ 0.999) sentetik senaryolar üzerindedir; gerçek veride performans daha düşük olacaktır. Sıradaki adım: IEEE-CIS / PaySim gibi açık veri setlerinde doğrulama.
 - **Money Mule @ alert eşiği:** Operating point'te recall 1.00 iken `0.70` alert eşiğinde ~0.75; mule hub'ları için eşik kalibrasyonu veya ayrı bir hesap-seviyesi model planlanıyor.
 - **Tek süreç / SQLite:** `ScoringService` durumu bellekte tutar; yatay ölçekleme için PostgreSQL + paylaşımlı özellik deposu (Redis) gerekir.
-- **Kimlik doğrulama yok:** API ve dashboard demo amaçlı açıktır; üretimde OAuth2/JWT ve rol bazlı yetki eklenmelidir.
+- **Kimlik doğrulama:** Yazma uçları için opsiyonel API anahtarı var; üretim için analist bazlı OAuth2/JWT ve rol bazlı yetki (RBAC) eklenmelidir.
 - **Model sürümleme / drift izleme:** MLflow ile model kaydı ve özellik dağılımı drift alarmı henüz yok.
 
 ## Lisans ve uyarı
 
-Tüm veriler sentetiktir; gerçek kişi veya hesap bilgisi içermez. Proje eğitim ve portföy amaçlıdır.
+[MIT](LICENSE) lisansı ile dağıtılır. Tüm veriler sentetiktir; gerçek kişi veya hesap bilgisi içermez. Proje eğitim ve portföy amaçlıdır.
