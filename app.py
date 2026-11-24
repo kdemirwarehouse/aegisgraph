@@ -1,6 +1,8 @@
 from pathlib import Path
+
 import gradio as gr
 import uvicorn
+
 from config.settings import get_settings
 from src.api.main import app as fastapi_app
 

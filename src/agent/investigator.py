@@ -1,7 +1,5 @@
 """Otonom finansal soruşturma ajanı ve MASAK/SAR rapor sentezleyicisi.
 
-
-UTC = timezone.utc
 Ajan yalnızca salt-okunur kanıt araçlarını çağırarak delil zinciri toplar,
 şüpheli tipolojiyi sınıflandırır, Türkçe MASAK/SAR formatında özet üretir ve
 **Human-in-the-Loop** ilkesi gereği daima insan analist onayı bekleyen bir
@@ -11,9 +9,7 @@ aksiyon önerisi sunar (asla otomatik `CONFIRMED_FRAUD` kararı vermez).
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
-
-UTC = timezone.utc
+from datetime import datetime
 from typing import Any
 
 import httpx
@@ -22,6 +18,7 @@ from sqlalchemy import Engine, select
 
 from config.settings import Settings, get_settings
 from src.agent.tools import InvestigationToolkit
+from src.compat import UTC
 from src.database.db import get_engine, session_scope
 from src.database.models import (
     Alert,

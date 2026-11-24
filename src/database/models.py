@@ -15,14 +15,6 @@ from __future__ import annotations
 import re
 from datetime import datetime
 from decimal import Decimal
-
-try:
-    from enum import StrEnum
-except ImportError:
-    from enum import Enum
-    class StrEnum(str, Enum):
-        pass
-
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, IPvAnyAddress, model_validator
@@ -41,6 +33,8 @@ from sqlalchemy import (
 )
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+from src.compat import StrEnum
 
 
 # --------------------------------------------------------------------------- #

@@ -1,7 +1,5 @@
 """Temporal split + dengesiz veri için LightGBM eğitimi ve bankacılık odaklı değerlendirme.
 
-
-UTC = timezone.utc
 Akış:
     DB → FeatureExtractor.fit_transform (point-in-time) → kronolojik train/val/test
     → Logistic Regression baseline + LightGBM rastgele hiperparametre araması (val PR-AUC)
@@ -20,9 +18,7 @@ import json
 import logging
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-
-UTC = timezone.utc
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +32,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 from config.settings import ModelSettings, get_settings
+from src.compat import UTC
 from src.database.models import FraudScenario
 from src.features.graph_features import GRAPH_FEATURES
 from src.features.pipeline import FEATURE_COLUMNS, FeatureExtractor

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 import pytest
@@ -23,6 +23,7 @@ from src.agent.tools import (
 )
 from src.api.main import create_app
 from src.api.scoring_service import ScoringService
+from src.compat import UTC
 from src.database.db import create_db_engine, init_db, persist_dataset, session_scope
 from src.database.models import (
     GROUND_TRUTH_COLUMNS,

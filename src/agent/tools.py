@@ -1,7 +1,5 @@
 """Otonom finansal soruşturma ajanı için salt-okunur ve belirlenimci kanıt toplama araçları.
 
-
-UTC = timezone.utc
 Tüm araçlar:
   * Veritabanına hiçbir yazma yapmaz (read-only).
   * `GROUND_TRUTH_COLUMNS` etiketlerini asla okumaz ve çıktıya dahil etmez.
@@ -16,9 +14,7 @@ from __future__ import annotations
 
 import itertools
 import logging
-from datetime import datetime, timedelta, timezone
-
-UTC = timezone.utc
+from datetime import datetime, timedelta
 from statistics import median
 from typing import Any
 
@@ -26,6 +22,7 @@ import networkx as nx
 from sqlalchemy import Engine, func, or_, select
 
 from config.settings import Settings, get_settings
+from src.compat import UTC
 from src.database.db import get_engine, session_scope
 from src.database.models import (
     Account,
