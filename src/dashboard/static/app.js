@@ -25,6 +25,43 @@
     sse: null,
   };
 
+  const API_KEY_STORAGE = "aegisgraph.writeApiKey";
+
+  function readStoredApiKey() {
+    try {
+      return window.sessionStorage.getItem(API_KEY_STORAGE) || "";
+    } catch {
+      return "";
+    }
+  }
+
+  function storeApiKey(value) {
+    try {
+      if (value) window.sessionStorage.setItem(API_KEY_STORAGE, value);
+      else window.sessionStorage.removeItem(API_KEY_STORAGE);
+    } catch {
+      /* depolama kapalıysa anahtar yalnızca bu istek için kullanılır */
+    }
+  }
+
+  // Yazma uçları (POST/PATCH) için: sunucu X-API-Key isterse (401) analistten anahtar alınır ve tekrar denenir.
+  async function writeFetch(url, options = {}) {
+    const send = (key) => {
+      const headers = { ...(options.headers || {}) };
+      if (key) headers["X-API-Key"] = key;
+      return fetch(url, { ...options, headers });
+    };
+    let resp = await send(readStoredApiKey());
+    if (resp.status === 401) {
+      const entered = window.prompt("Bu işlem için yazma API anahtarı (X-API-Key) gerekli:");
+      if (entered) {
+        resp = await send(entered.trim());
+        storeApiKey(resp.status === 401 ? "" : entered.trim());
+      }
+    }
+    return resp;
+  }
+
   const els = {
     sseIndicator: document.getElementById("sse-indicator"),
     sseStatusText: document.getElementById("sse-status-text"),
@@ -637,7 +674,7 @@
     const origText = els.btnRunAgent.textContent;
     els.btnRunAgent.textContent = "⏳ Soruşturuluyor...";
     try {
-      const resp = await fetch(`/alerts/${item.alert_id}/investigate`, { method: "POST" });
+      const resp = await writeFetch(`/alerts/${item.alert_id}/investigate`, { method: "POST" });
       if (!resp.ok) throw new Error(`Soruşturma başlatılamadı (${resp.status})`);
       const report = await resp.json();
       state.investigationsByAlert.set(item.alert_id, report);
@@ -665,7 +702,7 @@
       FALSE_POSITIVE: "SOC Dashboard üzerinden analist tarafından yanlış alarm olarak işaretlendi.",
     };
     try {
-      const resp = await fetch(`/alerts/${item.alert_id}`, {
+      const resp = await writeFetch(`/alerts/${item.alert_id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -695,7 +732,7 @@
     const count = Number(button.getAttribute("data-count") || 15);
     button.disabled = true;
     try {
-      const resp = await fetch("/simulator/run", {
+      const resp = await writeFetch("/simulator/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ scenario, count }),

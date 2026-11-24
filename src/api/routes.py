@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import json
+import secrets
 import time
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, IPvAnyAddress, model_validator
 
@@ -37,6 +38,25 @@ def get_scoring_service(request: Request) -> ScoringService:
 
 
 ServiceDep = Annotated[ScoringService, Depends(get_scoring_service)]
+
+
+def require_write_key(
+    service: ServiceDep,
+    x_api_key: Annotated[str | None, Header(alias="X-API-Key")] = None,
+) -> None:
+    """`settings.api.write_api_key` tanımlıysa yazma uçlarında `X-API-Key` başlığını doğrular."""
+    expected = service.settings.api.write_api_key
+    if expected is None or not expected.get_secret_value():
+        return
+    if x_api_key is None or not secrets.compare_digest(x_api_key, expected.get_secret_value()):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Geçerli X-API-Key başlığı gerekli",
+            headers={"WWW-Authenticate": "ApiKey"},
+        )
+
+
+WriteGuard = [Depends(require_write_key)]
 
 
 # --------------------------------------------------------------------------- #
@@ -213,6 +233,7 @@ class HealthResponse(BaseModel):
     alert_threshold: float
     review_threshold: float
     block_threshold: float
+    write_auth_required: bool = False
 
 
 class SimulatorRunRequest(BaseModel):
@@ -240,6 +261,7 @@ class SimulatorRunResponse(BaseModel):
 def health_check(service: ServiceDep) -> HealthResponse:
     """Servis sağlık durumunu ve aktif karar eşiklerini döndürür."""
     risk = service.settings.risk
+    key = service.settings.api.write_api_key
     return HealthResponse(
         status="ok",
         app_name=service.settings.app_name,
@@ -248,10 +270,11 @@ def health_check(service: ServiceDep) -> HealthResponse:
         alert_threshold=risk.alert_score,
         review_threshold=risk.review_score,
         block_threshold=risk.block_score,
+        write_auth_required=bool(key is not None and key.get_secret_value()),
     )
 
 
-@router.post("/transactions/score", response_model=TransactionScoreResponse, tags=["skorlama"])
+@router.post("/transactions/score", response_model=TransactionScoreResponse, tags=["skorlama"], dependencies=WriteGuard)
 def score_transaction(
     payload: TransactionScoreRequest,
     service: ServiceDep,
@@ -403,7 +426,7 @@ def get_alert(
     return AlertItemModel(**data)
 
 
-@router.patch("/alerts/{alert_id}", response_model=AlertItemModel, tags=["alarmlar"])
+@router.patch("/alerts/{alert_id}", response_model=AlertItemModel, tags=["alarmlar"], dependencies=WriteGuard)
 def update_alert(
     alert_id: int,
     payload: AlertUpdateRequest,
@@ -424,7 +447,12 @@ def update_alert(
     return AlertItemModel(**data)
 
 
-@router.post("/alerts/{alert_id}/investigate", response_model=InvestigationResponse, tags=["soruşturma"])
+@router.post(
+    "/alerts/{alert_id}/investigate",
+    response_model=InvestigationResponse,
+    tags=["soruşturma"],
+    dependencies=WriteGuard,
+)
 def investigate_alert(
     alert_id: int,
     service: ServiceDep,
@@ -465,7 +493,7 @@ def get_account_graph(
     return AccountGraphResponse(**data)
 
 
-@router.post("/simulator/run", response_model=SimulatorRunResponse, tags=["simülatör"])
+@router.post("/simulator/run", response_model=SimulatorRunResponse, tags=["simülatör"], dependencies=WriteGuard)
 def trigger_simulation(
     payload: SimulatorRunRequest,
     background_tasks: BackgroundTasks,

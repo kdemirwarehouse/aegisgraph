@@ -5,18 +5,20 @@ from __future__ import annotations
 import asyncio
 import json
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 import httpx
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 from sqlalchemy import Engine, select
 
 from config.settings import FeatureSettings, GeneratorSettings, ModelSettings, Settings
 from src.api.main import create_app
 from src.api.scoring_service import ScoringService, mask_iban
 from src.api.simulator import TrafficSimulator
+from src.compat import UTC
 from src.database.db import create_db_engine, init_db, persist_dataset, session_scope
 from src.database.models import AccountType, Alert, AlertStatus, Channel, Transaction, TransactionType
 from src.features.pipeline import FeatureExtractor
@@ -454,3 +456,25 @@ def test_sse_live_push_with_async_client(api_env: ApiTestEnv) -> None:
 
     events = asyncio.run(_run_live())
     assert events == ["transaction"]
+
+
+def test_write_endpoints_require_api_key_when_configured(api_env: ApiTestEnv, monkeypatch: pytest.MonkeyPatch) -> None:
+    client = api_env.client
+    # Varsayılan demo modu: anahtar tanımlı değil, yazma uçları açık (404 = yetki geçti, alarm yok)
+    assert client.get("/health").json()["write_auth_required"] is False
+    assert client.patch("/alerts/987654", json={"status": "INVESTIGATING"}).status_code == 404
+
+    secured = api_env.settings.model_copy(
+        update={"api": api_env.settings.api.model_copy(update={"write_api_key": SecretStr("s3cret-key")})}
+    )
+    monkeypatch.setattr(api_env.service, "settings", secured)
+
+    assert client.get("/health").json()["write_auth_required"] is True
+    payload = {"status": "INVESTIGATING"}
+    assert client.patch("/alerts/987654", json=payload).status_code == 401
+    assert client.patch("/alerts/987654", json=payload, headers={"X-API-Key": "yanlis"}).status_code == 401
+    assert client.post("/alerts/987654/investigate").status_code == 401
+    assert client.post("/simulator/run", json={"scenario": "NORMAL", "count": 1}).status_code == 401
+    assert client.patch("/alerts/987654", json=payload, headers={"X-API-Key": "s3cret-key"}).status_code == 404
+    # Okuma uçları anahtar istemez
+    assert client.get("/alerts").status_code == 200

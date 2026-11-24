@@ -140,6 +140,10 @@ class ApiSettings(BaseModel):
     graph_max_nodes: int = Field(150, ge=10, le=1000)
     simulator_tps: float = Field(5.0, gt=0, le=200.0)
     simulator_fraud_ratio: float = Field(0.25, ge=0, le=1)
+    write_api_key: SecretStr | None = Field(
+        None,
+        description="Tanımlıysa yazma uçları (POST/PATCH) `X-API-Key` başlığı ister; boşsa demo modu (açık)",
+    )
 
 
 class AgentSettings(BaseModel):
